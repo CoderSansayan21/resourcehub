@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef } from "react";
+import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { cn } from "@/lib/utils";
 
 type InputProps = ComponentPropsWithoutRef<"input"> & {
@@ -6,7 +6,10 @@ type InputProps = ComponentPropsWithoutRef<"input"> & {
   hint?: string;
 };
 
-export function Input({ className, hint, id, label, ...props }: InputProps) {
+export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+  { className, hint, id, label, ...props },
+  ref,
+) {
   const inputId = id ?? props.name ?? label.toLowerCase().replaceAll(" ", "-");
   const hintId = hint ? `${inputId}-hint` : undefined;
 
@@ -24,6 +27,7 @@ export function Input({ className, hint, id, label, ...props }: InputProps) {
           className,
         )}
         id={inputId}
+        ref={ref}
         {...props}
       />
       {hint ? (
@@ -33,4 +37,4 @@ export function Input({ className, hint, id, label, ...props }: InputProps) {
       ) : null}
     </div>
   );
-}
+});

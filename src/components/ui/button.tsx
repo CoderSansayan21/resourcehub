@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const variants = {
@@ -46,20 +46,19 @@ function buttonClasses(
   );
 }
 
-export function Button({
-  className,
-  variant = "primary",
-  size = "md",
-  ...props
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant = "primary", size = "md", ...props },
+  ref,
+) {
   return (
     <button
       className={buttonClasses(variant, size, className)}
+      ref={ref}
       type={props.type ?? "button"}
       {...props}
     />
   );
-}
+});
 
 export function ButtonLink({
   className,
