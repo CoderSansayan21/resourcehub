@@ -8,6 +8,7 @@ import {
   PackageSearch,
   UsersRound,
 } from "lucide-react";
+import { ReservationBookingForm } from "@/components/reservation-booking-form";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -158,15 +159,16 @@ export default async function ResourceDetailsPage({
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">
-                    Reservations coming next
+                    Reserve this resource
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-muted">
-                    This page is ready for future booking integration. Availability
-                    and reservation actions are not enabled yet.
+                    Request a confirmed booking. The server checks resource
+                    visibility and protected overlap rules before confirming.
                   </p>
                 </div>
               </div>
             </CardHeader>
+            <ReservationBookingForm resource={resource} />
           </Card>
 
           <Card>

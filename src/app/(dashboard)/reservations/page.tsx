@@ -1,41 +1,37 @@
-﻿import { CalendarClock, Plus } from "lucide-react";
-import { ButtonLink } from "@/components/ui/button";
-import { Card, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { ReservationManager } from "@/components/reservation-manager";
 import { PageHeading } from "@/components/ui/page-heading";
+import { requireUser } from "@/lib/authorization";
+import { listReservationsForCurrentUser } from "@/lib/reservations";
 
 export const instant = false;
 
-export default function ReservationsPage() {
+export default async function ReservationsPage() {
+  const [user, reservations] = await Promise.all([
+    requireUser(),
+    listReservationsForCurrentUser(),
+  ]);
+
   return (
     <div className="space-y-8">
       <PageHeading
-        description="A management surface for upcoming, past, and cancelled reservations once booking functionality exists."
-        eyebrow="My reservations"
-        title="Track your workplace reservations"
+        description={
+          user.role === "ADMIN"
+            ? "Inspect every reservation across ResourceHub. Cross-user edits and cancellations remain disabled in this stage."
+            : "Review upcoming bookings, update future reservations, and keep cancelled bookings in your history."
+        }
+        eyebrow={user.role === "ADMIN" ? "All reservations" : "My reservations"}
+        title={
+          user.role === "ADMIN"
+            ? "Reservation operations"
+            : "Track your workplace reservations"
+        }
       />
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-slate-950">
-            Reservation list
-          </h2>
-          <p className="text-sm text-muted">
-            This stage intentionally avoids booking actions and database reads.
-          </p>
-        </CardHeader>
-        <EmptyState
-          action={
-            <ButtonLink href="/resources" variant="secondary">
-              Start with resources
-              <Plus aria-hidden="true" className="size-4" />
-            </ButtonLink>
-          }
-          description="Confirmed and cancelled reservations will appear here after the reservation flow is implemented."
-          icon={CalendarClock}
-          title="No reservations to show yet"
-        />
-      </Card>
+      <ReservationManager
+        currentUserId={user.id}
+        reservations={reservations}
+        userRole={user.role}
+      />
     </div>
   );
 }
