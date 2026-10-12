@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String
+  email        String        @unique
+  role         UserRole
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  reservations Reservation[]
+}
+
+model Resource {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String
+  type         String
+  description  String?
+  location     String?
+  capacity     Int?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(6)
+  reservations Reservation[]
+}
+
+model Reservation {
+  id         String            @id @default(uuid()) @db.Uuid
+  userId     String            @db.Uuid
+  resourceId String            @db.Uuid
+  title      String
+  startTime  DateTime          @db.Timestamptz(6)
+  endTime    DateTime          @db.Timestamptz(6)
+  status     ReservationStatus
+  notes      String?
+  createdAt  DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime          @updatedAt @db.Timestamptz(6)
+  user       User              @relation(fields: [userId], references: [id])
+  resource   Resource          @relation(fields: [resourceId], references: [id])
+
+  @@index([userId, startTime])
+  @@index([resourceId, startTime])
+  @@index([resourceId, status, startTime, endTime])
+  @@index([startTime, endTime])
+}
