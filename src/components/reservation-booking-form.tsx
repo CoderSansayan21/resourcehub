@@ -34,6 +34,8 @@ type FormValues = {
 type FormErrors = Partial<Record<keyof FormValues, string>>;
 
 const MAX_DURATION_MS = 8 * 60 * 60 * 1000;
+const DEFAULT_START_HOUR = 9;
+const DEFAULT_DURATION_HOURS = 1;
 
 function getApiMessage(error: unknown) {
   return error instanceof Error
@@ -50,6 +52,40 @@ function getTimezoneLabel() {
     .find((part) => part.type === "timeZoneName")?.value;
 
   return `${zone}${offset ? ` (${offset})` : ""}`;
+}
+
+function getInitialValues(initialDate?: string): FormValues {
+  if (!initialDate) {
+    return {
+      endTime: "",
+      notes: "",
+      startTime: "",
+      title: "",
+    };
+  }
+
+  const startHour = String(DEFAULT_START_HOUR).padStart(2, "0");
+  const endHour = String(DEFAULT_START_HOUR + DEFAULT_DURATION_HOURS).padStart(
+    2,
+    "0",
+  );
+
+  return {
+    endTime: `${initialDate}T${endHour}:00`,
+    notes: "",
+    startTime: `${initialDate}T${startHour}:00`,
+    title: "",
+  };
+}
+
+function formatSelectedDate(initialDate: string) {
+  const [year, month, day] = initialDate.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, day, 12));
 }
 
 function localDateTimeToUtcIso(value: string, field: string) {
@@ -132,21 +168,37 @@ function buildPayload(resourceId: string, values: FormValues) {
 }
 
 export function ReservationBookingForm({
+  initialDate,
   resource,
 }: {
+  initialDate?: string;
   resource: BookingResource;
 }) {
-  const [values, setValues] = useState<FormValues>({
-    endTime: "",
-    notes: "",
-    startTime: "",
-    title: "",
-  });
+  const [values, setValues] = useState<FormValues>(() =>
+    getInitialValues(initialDate),
+  );
   const [errors, setErrors] = useState<FormErrors>({});
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
+  const [conflict, setConflict] = useState(false);
   const [pending, setPending] = useState(false);
   const timezoneLabel = useMemo(() => getTimezoneLabel(), []);
+  const selectedDateLabel = useMemo(
+    () => (initialDate ? formatSelectedDate(initialDate) : null),
+    [initialDate],
+  );
+  const availabilityHref = useMemo(() => {
+    const params = new URLSearchParams({
+      date: values.startTime.slice(0, 10) || initialDate || "",
+      resourceId: resource.id,
+    });
+
+    if (!params.get("date")) {
+      params.delete("date");
+    }
+
+    return `/availability?${params.toString()}`;
+  }, [initialDate, resource.id, values.startTime]);
 
   function updateField(field: keyof FormValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -160,6 +212,7 @@ export function ReservationBookingForm({
     setErrors(nextErrors);
     setMessage("");
     setSuccess(false);
+    setConflict(false);
 
     if (Object.keys(nextErrors).length > 0) {
       return;
@@ -178,16 +231,17 @@ export function ReservationBookingForm({
         | null;
 
       if (!response.ok) {
-        throw new Error(
-          response.status === 409
-            ? "That time is unavailable for this resource. Choose a different slot."
-            : data?.error?.message ?? "Reservation could not be created.",
-        );
+        if (response.status === 409) {
+          setConflict(true);
+          throw new Error("That time is unavailable for this resource. Choose a different slot.");
+        }
+
+        throw new Error(data?.error?.message ?? "Reservation could not be created.");
       }
 
       setSuccess(true);
       setMessage("Reservation confirmed.");
-      setValues({ endTime: "", notes: "", startTime: "", title: "" });
+      setValues(getInitialValues(initialDate));
     } catch (error) {
       setMessage(getApiMessage(error));
     } finally {
@@ -210,6 +264,11 @@ export function ReservationBookingForm({
         <span className="block text-xs text-muted">
           Times are entered in your local timezone: {timezoneLabel}.
         </span>
+        {selectedDateLabel ? (
+          <span className="mt-1 block text-xs font-medium text-slate-700">
+            Started from availability for {selectedDateLabel}.
+          </span>
+        ) : null}
       </div>
 
       {message ? (
@@ -232,6 +291,10 @@ export function ReservationBookingForm({
             {success ? (
               <Link className="font-semibold underline" href="/reservations">
                 View in reservations
+              </Link>
+            ) : conflict ? (
+              <Link className="font-semibold underline" href={availabilityHref}>
+                Check availability
               </Link>
             ) : null}
           </span>

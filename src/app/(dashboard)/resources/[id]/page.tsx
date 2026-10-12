@@ -31,6 +31,27 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
+function getValidDateParam(value: string | string[] | undefined) {
+  const date = Array.isArray(value) ? value[0] : value;
+
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return undefined;
+  }
+
+  const [year, month, day] = date.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return date;
+}
+
 function StatusBadge({ resource }: { resource: ResourceDto }) {
   return (
     <Badge
@@ -77,11 +98,14 @@ function ResourceUnavailable() {
 
 export default async function ResourceDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ date?: string | string[] }>;
 }) {
   await requireUser();
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const initialBookingDate = getValidDateParam(query.date);
 
   let resource: ResourceDto;
 
@@ -168,7 +192,10 @@ export default async function ResourceDetailsPage({
                 </div>
               </div>
             </CardHeader>
-            <ReservationBookingForm resource={resource} />
+            <ReservationBookingForm
+              initialDate={initialBookingDate}
+              resource={resource}
+            />
           </Card>
 
           <Card>
