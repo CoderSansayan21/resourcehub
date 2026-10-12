@@ -1,220 +1,390 @@
-﻿import Link from "next/link";
-
 import {
   ArrowRight,
-  BriefcaseBusiness,
   CalendarClock,
-  Monitor,
-  Search,
-  UsersRound,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  LayoutDashboard,
+  PackageSearch,
+  Settings,
 } from "lucide-react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  getDashboardData,
+  type DashboardReservationSummary,
+} from "@/lib/dashboard";
+import { cn } from "@/lib/utils";
 
 export const instant = false;
 
-const resourceCategories = [
-  {
-    title: "Meeting Rooms",
-    description: "Find rooms for team meetings, interviews and focused sessions.",
-    href: "/resources?type=meeting-room",
-    icon: UsersRound,
-  },
-  {
-    title: "Equipment",
-    description: "Browse shared devices, presentation kits and workplace gear.",
-    href: "/resources?type=equipment",
-    icon: Monitor,
-  },
-  {
-    title: "Shared Spaces",
-    description: "Explore flexible areas for collaboration and daily work.",
-    href: "/resources?type=shared-space",
-    icon: BriefcaseBusiness,
-  },
-];
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
 
-export default function DashboardPage() {
+function formatDateTime(startTime: string, endTime: string) {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const date = new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "short",
+    weekday: "short",
+    year: "numeric",
+  }).format(start);
+  const startLabel = new Intl.DateTimeFormat("en", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(start);
+  const endLabel = new Intl.DateTimeFormat("en", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(end);
+
+  return `${date}, ${startLabel} - ${endLabel}`;
+}
+
+function StatCard({
+  description,
+  label,
+  tone = "default",
+  value,
+}: {
+  description: string;
+  label: string;
+  tone?: "default" | "primary";
+  value: number;
+}) {
+  return (
+    <Card
+      className={cn(
+        "p-5",
+        tone === "primary" ? "border-[#9CC8C3] bg-[#F0FAF8]" : "bg-white",
+      )}
+    >
+      <p className="text-sm font-medium text-muted">{label}</p>
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+        {value.toLocaleString("en")}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
+    </Card>
+  );
+}
+
+function ReservationItem({
+  reservation,
+}: {
+  reservation: DashboardReservationSummary;
+}) {
+  return (
+    <li className="rounded-md border border-border bg-white px-4 py-3 shadow-sm shadow-slate-200/60">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="font-semibold text-slate-950">{reservation.title}</p>
+          <p className="mt-1 text-sm text-muted">{reservation.resource.name}</p>
+          {reservation.resource.location ? (
+            <p className="mt-1 text-xs text-muted">
+              {reservation.resource.location}
+            </p>
+          ) : null}
+        </div>
+        <time
+          className="text-sm font-medium text-slate-700 sm:text-right"
+          dateTime={reservation.startTime}
+        >
+          {formatDateTime(reservation.startTime, reservation.endTime)}
+        </time>
+      </div>
+    </li>
+  );
+}
+
+function QuickActions({ role }: { role: "ADMIN" | "MEMBER" }) {
+  const actions =
+    role === "ADMIN"
+      ? [
+          {
+            description: "Manage resource inventory and activation status.",
+            href: "/admin",
+            icon: Settings,
+            label: "Admin resources",
+          },
+          {
+            description: "Inspect confirmed blocks before advising teams.",
+            href: "/availability",
+            icon: CalendarDays,
+            label: "Availability",
+          },
+          {
+            description: "Review reservation activity across ResourceHub.",
+            href: "/reservations",
+            icon: ClipboardList,
+            label: "Reservations",
+          },
+        ]
+      : [
+          {
+            description: "Browse active rooms, equipment and spaces.",
+            href: "/resources",
+            icon: PackageSearch,
+            label: "Find resources",
+          },
+          {
+            description: "Check confirmed bookings before choosing a time.",
+            href: "/availability",
+            icon: CalendarDays,
+            label: "View availability",
+          },
+          {
+            description: "See upcoming, past and cancelled bookings.",
+            href: "/reservations",
+            icon: ClipboardList,
+            label: "My reservations",
+          },
+        ];
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+          Quick actions
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Jump into the workflows most useful from this dashboard.
+        </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {actions.map((action) => {
+          const Icon = action.icon;
+
+          return (
+            <ButtonLink
+              className="h-auto justify-start rounded-lg border-border bg-white p-5 text-left text-slate-900 shadow-sm shadow-slate-200/70 hover:bg-[#FBFDFC]"
+              href={action.href}
+              key={action.href}
+              variant="secondary"
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-[#E6F2F0] text-primary">
+                <Icon aria-hidden="true" className="size-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold">{action.label}</span>
+                <span className="mt-1 block text-sm font-normal leading-6 text-muted">
+                  {action.description}
+                </span>
+              </span>
+              <ArrowRight
+                aria-hidden="true"
+                className="ml-auto size-4 shrink-0 text-slate-400"
+              />
+            </ButtonLink>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export default async function DashboardPage() {
+  const dashboard = await getDashboardData();
+  const isAdmin = dashboard.currentUser.role === "ADMIN";
+
   return (
     <div className="space-y-8">
       <section className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.08em] text-primary">
-            Employee workspace
+            {isAdmin ? "Administrator dashboard" : "Employee workspace"}
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Find your next workspace.
+            {isAdmin
+              ? "ResourceHub operations at a glance."
+              : `Welcome back, ${dashboard.currentUser.name}.`}
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-muted">
-            Discover rooms, equipment and shared spaces in one place.
+            {isAdmin
+              ? "Monitor real resource inventory and upcoming confirmed reservations across the workspace."
+              : "Track your upcoming bookings and jump back into resource discovery when you need a room, space or shared asset."}
           </p>
         </div>
-        <ButtonLink href="/availability" variant="secondary">
-          View availability
+        <ButtonLink href={isAdmin ? "/admin" : "/resources"} variant="secondary">
+          {isAdmin ? "Manage resources" : "Browse resources"}
           <ArrowRight aria-hidden="true" className="size-4" />
         </ButtonLink>
       </section>
 
-      <Card className="p-6 sm:p-7">
-        <CardHeader className="mb-6">
-          <div className="flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-[#E6F2F0] text-primary">
-              <Search aria-hidden="true" className="size-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-slate-950">
-                Search for a resource
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-muted">
-                Choose your preferences to continue to resource discovery. Live
-                availability matching will connect in a later stage.
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-
-        <form
-          action="/resources"
-          className="grid gap-4 lg:grid-cols-[1.35fr_1fr_0.9fr_0.9fr_auto]"
-        >
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-800"
-              htmlFor="resource-keyword"
-            >
-              Keyword
-            </label>
-            <input
-              className="h-11 w-full rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
-              id="resource-keyword"
-              name="q"
-              placeholder="Room, projector, desk"
-              type="search"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label
-              className="text-sm font-medium text-slate-800"
-              htmlFor="resource-type"
-            >
-              Type
-            </label>
-            <select
-              className="h-11 w-full rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
-              id="resource-type"
-              name="type"
-            >
-              <option value="">Any resource</option>
-              <option value="meeting-room">Meeting room</option>
-              <option value="equipment">Equipment</option>
-              <option value="shared-space">Shared space</option>
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-800" htmlFor="date">
-              Date
-            </label>
-            <input
-              className="h-11 w-full rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
-              id="date"
-              name="date"
-              type="date"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-800" htmlFor="time">
-              Time
-            </label>
-            <input
-              className="h-11 w-full rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
-              id="time"
-              name="time"
-              type="time"
-            />
-          </div>
-
-          <div className="flex items-end">
-            <Button className="h-11 w-full px-5" type="submit">
-              Search
-              <ArrowRight aria-hidden="true" className="size-4" />
-            </Button>
-          </div>
-        </form>
-      </Card>
-
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-slate-950">
-            Browse by category
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Start with the resource type that best fits your booking need.
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {resourceCategories.map((category) => {
-            const Icon = category.icon;
-            return (
-              <Link
-                className="group rounded-lg border border-border bg-white p-5 shadow-sm shadow-slate-200/70 transition-colors hover:border-[#9CC8C3] hover:bg-[#FBFDFC] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                href={category.href}
-                key={category.title}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex size-11 items-center justify-center rounded-md bg-[#E6F2F0] text-primary">
-                    <Icon aria-hidden="true" className="size-5" />
-                  </div>
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="mt-1 size-4 text-slate-400 transition-colors group-hover:text-primary"
-                  />
-                </div>
-                <h3 className="mt-5 text-lg font-semibold text-slate-950">
-                  {category.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-muted">
-                  {category.description}
-                </p>
-              </Link>
-            );
-          })}
-        </div>
+      <section className={cn("grid gap-4", isAdmin ? "md:grid-cols-3" : "md:grid-cols-2")}>
+        {isAdmin ? (
+          <StatCard
+            description="All resources in the catalog, active and inactive."
+            label="Total resources"
+            value={dashboard.totalResourceCount ?? dashboard.activeResourceCount}
+          />
+        ) : null}
+        <StatCard
+          description={
+            isAdmin
+              ? "Resources currently visible for member bookings."
+              : "Resources currently available in the member catalog."
+          }
+          label="Active resources"
+          tone="primary"
+          value={dashboard.activeResourceCount}
+        />
+        <StatCard
+          description={
+            isAdmin
+              ? "Confirmed reservations with a future start time."
+              : "Your confirmed reservations with a future start time."
+          }
+          label={isAdmin ? "Upcoming confirmed" : "Your upcoming bookings"}
+          value={dashboard.upcomingConfirmedCount}
+        />
       </section>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-md bg-[#E6F2F0] text-primary">
-              <CalendarClock aria-hidden="true" className="size-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold tracking-tight text-slate-950">
-                Upcoming Reservations
-              </h2>
-              <p className="text-sm text-muted">
-                Your confirmed bookings will appear here once reservations are
-                enabled.
-              </p>
-            </div>
-          </div>
-        </CardHeader>
+      {dashboard.activeResourceCount === 0 ? (
         <EmptyState
           action={
-            <ButtonLink href="/resources" variant="secondary">
-              Explore resources
+            <ButtonLink href={isAdmin ? "/admin" : "/resources"} variant="secondary">
+              {isAdmin ? "Create a resource" : "Browse resources"}
               <ArrowRight aria-hidden="true" className="size-4" />
             </ButtonLink>
           }
-          description="You do not have any reservations yet. Start by browsing resources, then check availability before reserving."
-          icon={CalendarClock}
-          title="No upcoming reservations"
+          description={
+            isAdmin
+              ? "No active resources are available for member booking. Add or reactivate resources in Administration."
+              : "There are no active resources available to book right now."
+          }
+          icon={PackageSearch}
+          title="No active resources"
         />
-      </Card>
+      ) : null}
+      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card className="p-6 sm:p-7">
+          <CardHeader>
+            <div className="flex items-start gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-[#E6F2F0] text-primary">
+                <CalendarClock aria-hidden="true" className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                  {isAdmin ? "Next system booking" : "Next reservation"}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-muted">
+                  {isAdmin
+                    ? "The next confirmed reservation scheduled across all resources."
+                    : "Your next confirmed reservation, excluding cancelled or past bookings."}
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+
+          {dashboard.nextReservation ? (
+            <div className="rounded-lg border border-[#B5D2CE] bg-[#F0FAF8] p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2
+                  aria-hidden="true"
+                  className="mt-0.5 size-5 shrink-0 text-primary"
+                />
+                <div>
+                  <p className="text-lg font-semibold text-slate-950">
+                    {dashboard.nextReservation.title}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {dashboard.nextReservation.resource.name}
+                  </p>
+                  <time
+                    className="mt-3 block text-sm font-medium text-slate-900"
+                    dateTime={dashboard.nextReservation.startTime}
+                  >
+                    {formatDateTime(
+                      dashboard.nextReservation.startTime,
+                      dashboard.nextReservation.endTime,
+                    )}
+                  </time>
+                  {dashboard.nextReservation.resource.location ? (
+                    <p className="mt-2 text-sm text-muted">
+                      {dashboard.nextReservation.resource.location}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              action={
+                <ButtonLink
+                  href={isAdmin ? "/availability" : "/resources"}
+                  variant="secondary"
+                >
+                  {isAdmin ? "Inspect availability" : "Explore resources"}
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </ButtonLink>
+              }
+              description={
+                isAdmin
+                  ? "There are no upcoming confirmed reservations across the workspace."
+                  : "You do not have upcoming confirmed reservations yet. Browse resources or check availability to plan one."
+              }
+              icon={CalendarClock}
+              title="No upcoming reservations"
+            />
+          )}
+        </Card>
+
+        <Card className="p-6 sm:p-7">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                  {isAdmin ? "Upcoming reservation activity" : "Upcoming reservations"}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-muted">
+                  {isAdmin
+                    ? `${pluralize(
+                        dashboard.upcomingConfirmedCount,
+                        "confirmed booking",
+                      )} scheduled across ResourceHub.`
+                    : `${pluralize(
+                        dashboard.upcomingConfirmedCount,
+                        "confirmed booking",
+                      )} on your calendar.`}
+                </p>
+              </div>
+              <ButtonLink href="/reservations" size="sm" variant="secondary">
+                View all
+              </ButtonLink>
+            </div>
+          </CardHeader>
+
+          {dashboard.upcomingReservations.length > 0 ? (
+            <ul className="space-y-3">
+              {dashboard.upcomingReservations.map((reservation) => (
+                <ReservationItem key={reservation.id} reservation={reservation} />
+              ))}
+            </ul>
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+              <LayoutDashboard
+                aria-hidden="true"
+                className="mx-auto size-8 text-primary"
+              />
+              <h3 className="mt-4 font-semibold text-slate-950">
+                Nothing scheduled yet
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
+                {isAdmin
+                  ? "Upcoming confirmed reservations will appear here as members book resources."
+                  : "Your future confirmed bookings will appear here. Cancelled and past reservations stay in reservation history."}
+              </p>
+            </div>
+          )}
+        </Card>
+      </section>
+
+      <QuickActions role={dashboard.currentUser.role} />
     </div>
   );
 }
