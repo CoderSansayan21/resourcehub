@@ -1,7 +1,9 @@
-import { CalendarRange, Info } from "lucide-react";
+﻿import { CalendarRange, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { PageHeading } from "@/components/ui/page-heading";
+
+export const instant = false;
 
 const hours = ["8 AM", "10 AM", "12 PM", "2 PM", "4 PM", "6 PM"];
 const rows = ["Resource A", "Resource B", "Resource C"];

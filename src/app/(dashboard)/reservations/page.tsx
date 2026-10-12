@@ -1,8 +1,10 @@
-import { CalendarClock, Plus } from "lucide-react";
+﻿import { CalendarClock, Plus } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
+
+export const instant = false;
 
 export default function ReservationsPage() {
   return (

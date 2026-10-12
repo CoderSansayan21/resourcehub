@@ -1,4 +1,5 @@
-import Link from "next/link";
+﻿import Link from "next/link";
+
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -10,6 +11,8 @@ import {
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+
+export const instant = false;
 
 const resourceCategories = [
   {

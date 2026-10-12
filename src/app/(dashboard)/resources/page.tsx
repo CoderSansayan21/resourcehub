@@ -1,10 +1,12 @@
-import { Filter, Search, SlidersHorizontal } from "lucide-react";
+﻿import { Filter, Search, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { PageHeading } from "@/components/ui/page-heading";
+
+export const instant = false;
 
 export default function ResourcesPage() {
   return (

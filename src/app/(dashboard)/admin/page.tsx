@@ -1,10 +1,15 @@
-import { ShieldCheck } from "lucide-react";
+﻿import { ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeading } from "@/components/ui/page-heading";
+import { requireRole } from "@/lib/authorization";
 
-export default function AdminPage() {
+export const instant = false;
+
+export default async function AdminPage() {
+  await requireRole("ADMIN");
+
   return (
     <div className="space-y-8">
       <PageHeading
