@@ -1,9 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
+  Boxes,
+  BriefcaseBusiness,
   CheckCircle2,
+  Cpu,
+  DoorOpen,
   MapPin,
   PackageSearch,
   Search,
@@ -15,6 +20,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
+import {
+  getResourceCategoryValue,
+  getResourceCategoryLabel,
+  RESOURCE_CATEGORIES,
+  type ResourceCategoryValue,
+} from "@/lib/resource-categories";
 
 type Resource = {
   capacity: number | null;
@@ -29,11 +40,27 @@ type Resource = {
 };
 
 type ResourceCatalogProps = {
+  initialCategory?: string;
   initialQuery?: string;
   initialType?: string;
   resources: Resource[];
   userRole: "ADMIN" | "MEMBER";
 };
+
+const CATEGORY_ICONS: Record<ResourceCategoryValue, typeof DoorOpen> = {
+  "computer-labs": Cpu,
+  equipment: PackageSearch,
+  "meeting-rooms": DoorOpen,
+  others: Boxes,
+  workspaces: BriefcaseBusiness,
+};
+
+const OTHER_CATEGORY = "other";
+
+function categoryLabel(value: string) {
+  if (value === OTHER_CATEGORY) return "Other resources";
+  return RESOURCE_CATEGORIES.find((category) => category.value === value)?.label ?? value;
+}
 
 function normalize(value: string | null | undefined) {
   return value?.trim().toLowerCase() ?? "";
@@ -80,7 +107,9 @@ function ResourceCard({
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-primary">{resource.type}</p>
+          <p className="text-sm font-semibold text-[#087F73]">
+            {getResourceCategoryLabel(resource.type)}
+          </p>
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
             {resource.name}
           </h2>
@@ -133,7 +162,68 @@ function ResourceCard({
   );
 }
 
+function CategoryCard({
+  count,
+  description,
+  image,
+  label,
+  value,
+}: {
+  count: number;
+  description: string;
+  image?: string;
+  label: string;
+  value: string;
+}) {
+  const Icon = value === OTHER_CATEGORY ? PackageSearch : CATEGORY_ICONS[value as ResourceCategoryValue];
+  const [imageFailed, setImageFailed] = useState(false);
+
+  return (
+    <Link
+      className={cn(
+        "group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/70 transition duration-300 hover:-translate-y-1 hover:border-[#B5D2CE] hover:shadow-lg hover:shadow-teal-950/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]",
+        value === "others" && "sm:col-span-2",
+      )}
+      href={`/resources?category=${encodeURIComponent(value)}`}
+    >
+      <div className="relative h-44 overflow-hidden bg-[#E8F7F3] sm:h-48">
+        {image && !imageFailed ? (
+          <Image
+            alt={`${label} category`}
+            className="object-cover transition duration-500 group-hover:scale-105"
+            fill
+            onError={() => setImageFailed(true)}
+            sizes="(max-width: 639px) 100vw, (max-width: 1279px) 50vw, 25vw"
+            src={image}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-[#087F73]">
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-white/75 shadow-sm">
+              <Icon aria-hidden="true" className="size-7" />
+            </span>
+          </div>
+        )}
+        <span className="absolute right-4 top-4 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-xs font-bold text-[#063B3A] shadow-sm backdrop-blur-sm">
+          {count} active
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-[#E8F7F3] text-[#087F73]">
+          <Icon aria-hidden="true" className="size-5" />
+        </span>
+        <h3 className="mt-4 text-xl font-bold tracking-tight text-[#102D2C]">{label}</h3>
+        <p className="mt-2 flex-1 text-sm leading-6 text-slate-500">{description}</p>
+        <span className="mt-6 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#063B3A] px-4 text-sm font-bold text-white transition-colors group-hover:bg-[#087F73]">
+          Browse
+          <ArrowRight aria-hidden="true" className="size-4 transition-transform group-hover:translate-x-1" />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export function ResourceCatalog({
+  initialCategory,
   initialQuery,
   initialType,
   resources,
@@ -141,6 +231,7 @@ export function ResourceCatalog({
 }: ResourceCatalogProps) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [type, setType] = useState(initialType ?? "");
+  const category = initialCategory ?? "";
 
   const resourceTypes = useMemo(
     () =>
@@ -153,126 +244,159 @@ export function ResourceCatalog({
   const filteredResources = useMemo(() => {
     const normalizedQuery = normalize(query);
     const normalizedType = normalize(type);
+    const normalizedCategory = normalize(category);
 
     return resources.filter((resource) => {
       const typeMatches =
         !normalizedType || normalize(resource.type) === normalizedType;
+      const resourceCategory = getResourceCategoryValue(resource.type);
+      const categoryMatches =
+        !normalizedCategory ||
+        (normalizedCategory === OTHER_CATEGORY
+          ? resourceCategory === null
+          : resourceCategory === normalizedCategory);
       const queryMatches =
         !normalizedQuery ||
         normalize(resource.name).includes(normalizedQuery) ||
         normalize(resource.type).includes(normalizedQuery) ||
         normalize(resource.location).includes(normalizedQuery);
 
-      return typeMatches && queryMatches;
+      return categoryMatches && typeMatches && queryMatches;
     });
-  }, [query, resources, type]);
+  }, [category, query, resources, type]);
 
-  const hasResources = resources.length > 0;
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const resource of resources) {
+      if (!resource.isActive) continue;
+      const value = getResourceCategoryValue(resource.type) ?? OTHER_CATEGORY;
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [resources]);
+
   const hasFilteredResources = filteredResources.length > 0;
   const showInactiveStatus =
     userRole === "ADMIN" && resources.some((resource) => !resource.isActive);
+  const selectedCategory = category
+    ? categoryLabel(category)
+    : undefined;
+  const isCategoryLanding = !category && !query.trim() && !type;
+  const categoryCards = [
+    ...RESOURCE_CATEGORIES,
+    ...(categoryCounts.has(OTHER_CATEGORY)
+      ? [
+          {
+            description: "Existing resources with a legacy type are kept discoverable here.",
+            label: "Other resources",
+            value: OTHER_CATEGORY,
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <section className="space-y-5" aria-labelledby="resource-catalog-title">
-      <div className="rounded-lg border border-border bg-white p-5 shadow-sm shadow-slate-200/70">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <section className="space-y-6" aria-labelledby="resource-catalog-title">
+      {isCategoryLanding ? (
+        <>
           <div>
-            <h2
-              className="text-xl font-semibold tracking-tight text-slate-950"
-              id="resource-catalog-title"
-            >
-              Resource catalog
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-[#087F73]">
+              Explore by category
+            </p>
+            <h2 className="mt-1 text-3xl font-bold tracking-tight text-[#102D2C]" id="resource-catalog-title">
+              Find the right resource
             </h2>
-            <p className="mt-1 text-sm leading-6 text-muted">
-              {userRole === "ADMIN"
-                ? "Admins can see active and inactive resources here. Management actions stay in Administration."
-                : "Only active resources are shown in this catalog."}
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Choose a category to browse active resources, compare details, and plan your next booking.
             </p>
           </div>
-          <p className="text-sm font-medium text-muted">
-            Showing {filteredResources.length} of {resources.length}
-          </p>
-        </div>
-
-        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_16rem]">
-          <div className="relative">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted"
-            />
-            <label className="sr-only" htmlFor="resource-search">
-              Search resources
-            </label>
-            <input
-              className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
-              id="resource-search"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by name, type, or location"
-              type="search"
-              value={query}
-            />
+          <div className="grid gap-6 sm:grid-cols-2">
+            {categoryCards.map((item) => (
+              <CategoryCard
+                count={categoryCounts.get(item.value) ?? 0}
+                description={item.description}
+                image={"image" in item ? item.image : undefined}
+                key={item.value}
+                label={item.label}
+                value={item.value}
+              />
+            ))}
           </div>
-
-          <div>
-            <label className="sr-only" htmlFor="resource-type-filter">
-              Filter by resource type
-            </label>
-            <select
-              className="h-10 w-full rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
-              id="resource-type-filter"
-              onChange={(event) => setType(event.target.value)}
-              value={type}
-            >
-              <option value="">All resource types</option>
-              {resourceTypes.map((resourceType) => (
-                <option key={resourceType} value={resourceType}>
-                  {resourceType}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {!hasResources ? (
-        <EmptyState
-          description={
-            userRole === "ADMIN"
-              ? "No resources exist yet. Use Administration to create the first resource."
-              : "No active resources are available yet. Please check back after an administrator publishes resources."
-          }
-          icon={PackageSearch}
-          title="No resources available"
-        />
-      ) : !hasFilteredResources ? (
-        <EmptyState
-          action={
-            <Button
-              onClick={() => {
-                setQuery("");
-                setType("");
-              }}
-              type="button"
-              variant="secondary"
-            >
-              <SlidersHorizontal aria-hidden="true" className="size-4" />
-              Clear filters
-            </Button>
-          }
-          description="Try a different keyword or resource type."
-          icon={Search}
-          title="No matching resources"
-        />
+        </>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredResources.map((resource) => (
-            <ResourceCard
-              key={resource.id}
-              resource={resource}
-              showInactiveStatus={showInactiveStatus}
+        <>
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/70 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <Link className="text-sm font-bold text-[#087F73] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]" href="/resources">
+                  ← All categories
+                </Link>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#102D2C]" id="resource-catalog-title">
+                  {selectedCategory ?? "Resource search"}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  {selectedCategory
+                    ? `Browse active resources in ${selectedCategory}.`
+                    : "Search all active resources across ResourceHub."}
+                </p>
+              </div>
+              <p className="text-sm font-semibold text-slate-500">
+                Showing {filteredResources.length} of {resources.length}
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+              <div className="relative">
+                <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+                <label className="sr-only" htmlFor="resource-search">Search resources</label>
+                <input
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-[#F8FAF9] pl-9 pr-3 text-sm text-[#102D2C] shadow-inner shadow-slate-200/30 placeholder:text-slate-500 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
+                  id="resource-search"
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={selectedCategory ? `Search ${selectedCategory.toLowerCase()}` : "Search by name, type, or location"}
+                  type="search"
+                  value={query}
+                />
+              </div>
+              <div>
+                <label className="sr-only" htmlFor="resource-type-filter">Filter by resource type</label>
+                <select
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-[#F8FAF9] px-3 text-sm font-semibold text-[#102D2C] shadow-inner shadow-slate-200/30 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
+                  id="resource-type-filter"
+                  onChange={(event) => setType(event.target.value)}
+                  value={type}
+                >
+                  <option value="">All resource types</option>
+                  {resourceTypes.map((resourceType) => (
+                    <option key={resourceType} value={resourceType}>{getResourceCategoryLabel(resourceType)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {!hasFilteredResources ? (
+            <EmptyState
+              action={
+                <Button onClick={() => { setQuery(""); setType(""); }} type="button" variant="secondary">
+                  <SlidersHorizontal aria-hidden="true" className="size-4" />
+                  Clear filters
+                </Button>
+              }
+              description={category ? "Try another keyword or clear the category filters to continue browsing." : "Try a different keyword or resource type."}
+              icon={category ? PackageSearch : Search}
+              title={category ? "No resources in this category yet." : "No matching resources"}
             />
-          ))}
-        </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredResources.map((resource) => (
+                <ResourceCard key={resource.id} resource={resource} showInactiveStatus={showInactiveStatus} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </section>
   );

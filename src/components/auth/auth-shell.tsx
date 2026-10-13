@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import { CalendarCheck, ShieldCheck } from "lucide-react";
 
@@ -22,10 +23,19 @@ export function AuthShell({
       <div className="mx-auto grid min-h-screen w-full max-w-7xl lg:grid-cols-[1fr_0.92fr]">
         <section className="flex min-h-[34rem] flex-col justify-between bg-[#063B3A] px-6 py-8 text-white sm:px-10 lg:min-h-screen lg:px-12">
           <Link
-            className="w-fit rounded-md text-xl font-semibold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+            className="w-fit rounded-lg bg-white p-2 shadow-sm shadow-black/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
             href="/"
+            aria-label="ResourceHub home"
           >
-            ResourceHub
+            <Image
+              src="/resourcehub-logo-new.png"
+              alt="ResourceHub"
+              width={2172}
+              height={724}
+              priority
+              sizes="220px"
+              className="h-14 w-auto object-contain"
+            />
           </Link>
 
           <div className="max-w-xl py-12">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -11,7 +12,6 @@ import {
   CheckCircle2,
   Clock3,
   Loader2,
-  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -257,34 +257,50 @@ export function AvailabilityTimeline({
 
   if (resources.length === 0) {
     return (
-      <EmptyState
-        description="No visible resources are available for availability lookup yet."
-        icon={Search}
-        title="No resources available"
-      />
+      <section className="rounded-2xl border border-dashed border-[#B5D2CE] bg-white p-6 shadow-sm shadow-slate-200/70 sm:p-10">
+        <div className="flex min-h-[390px] flex-col items-center justify-center text-center">
+          <Image
+            alt="Empty availability calendar"
+            className="h-auto w-48 object-contain sm:w-60"
+            height={512}
+            src="/images/availability/availability-empty.png"
+            width={512}
+          />
+          <h2 className="mt-6 text-2xl font-bold tracking-tight text-[#102D2C]">
+            No resources available
+          </h2>
+          <p className="mt-3 max-w-md text-sm leading-6 text-slate-500">
+            No active resources are available for availability lookup yet.
+          </p>
+        </div>
+      </section>
     );
   }
 
   return (
     <section className="space-y-5" aria-labelledby="availability-title">
-      <Card>
-        <CardHeader>
+      <Card className="rounded-2xl border-slate-200/90 p-5 shadow-sm shadow-slate-200/70 sm:p-6">
+        <CardHeader className="mb-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2
-                className="text-xl font-semibold tracking-tight text-slate-950"
-                id="availability-title"
-              >
-                Day availability
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-muted">
-                Availability is informational. Reservation submission remains protected
-                by server validation and the database overlap constraint.
-              </p>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#E8F7F3] text-[#087F73]">
+                <CalendarDays aria-hidden="true" className="size-5" />
+              </span>
+              <div>
+                <h2
+                  className="text-xl font-bold tracking-tight text-[#102D2C]"
+                  id="availability-title"
+                >
+                  Check resource availability
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Select a resource and date to inspect confirmed booking blocks before you reserve.
+                </p>
+              </div>
             </div>
             {selectedResource ? (
               <Link
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-white shadow-sm shadow-teal-950/10 transition-colors hover:bg-[#066B62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#087F73] px-4 text-sm font-semibold text-white shadow-sm shadow-teal-950/10 transition hover:bg-[#066B62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]"
                 href={`/resources/${selectedResource.id}?date=${date}`}
               >
                 <CalendarDays aria-hidden="true" className="size-4" />
@@ -294,16 +310,16 @@ export function AvailabilityTimeline({
           </div>
         </CardHeader>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-end">
           <div className="space-y-2">
             <label
-              className="text-sm font-medium text-slate-800"
+              className="text-sm font-semibold text-[#102D2C]"
               htmlFor="availability-resource"
             >
               Resource
             </label>
             <select
-              className="h-10 w-full rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-[#F8FAF9] px-3 text-sm text-[#102D2C] shadow-inner shadow-slate-200/30 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
               id="availability-resource"
               onChange={(event) => updateResourceId(event.target.value)}
               value={resourceId}
@@ -319,7 +335,7 @@ export function AvailabilityTimeline({
 
           <div className="space-y-2">
             <label
-              className="text-sm font-medium text-slate-800"
+              className="text-sm font-semibold text-[#102D2C]"
               htmlFor="availability-date"
             >
               Date
@@ -336,7 +352,7 @@ export function AvailabilityTimeline({
                 <ArrowLeft aria-hidden="true" className="size-4" />
               </Button>
               <input
-                className="h-10 rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
+                className="h-11 rounded-xl border border-slate-200 bg-[#F8FAF9] px-3 text-sm text-[#102D2C] shadow-inner shadow-slate-200/30 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
                 id="availability-date"
                 onChange={(event) => updateDate(event.target.value)}
                 type="date"
@@ -353,11 +369,21 @@ export function AvailabilityTimeline({
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Button>
             </div>
-          </div>
+            </div>
+
+            <Button
+              className="h-11 rounded-xl px-5"
+              disabled={!resourceId || !date || loading}
+              onClick={() => void loadAvailability()}
+              type="button"
+            >
+              {loading ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
+              {loading ? "Checking..." : "Check availability"}
+            </Button>
         </div>
 
-        <div className="mt-4 flex items-start gap-3 rounded-md border border-[#B5D2CE] bg-[#F0FAF8] px-4 py-3 text-sm text-slate-700">
-          <Clock3 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div className="mt-5 flex items-start gap-3 rounded-xl border border-[#B5D2CE] bg-[#F0FAF8] px-4 py-3 text-sm text-[#35625F]">
+          <Clock3 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#087F73]" />
           <p>
             Showing {formatDate(date, timeZone)} in {getTimeZoneLabel(timeZone)}.
           </p>
@@ -366,7 +392,7 @@ export function AvailabilityTimeline({
 
       {error ? (
         <div
-          className="flex items-start gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           role="alert"
         >
           <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
@@ -385,9 +411,9 @@ export function AvailabilityTimeline({
         </div>
       ) : null}
 
-      <Card>
+      <Card className="rounded-2xl border-slate-200/90 p-5 shadow-sm shadow-slate-200/70 sm:p-6">
         {loading ? (
-          <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-muted">
+          <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-slate-500">
             <Loader2 aria-hidden="true" className="size-5 animate-spin text-primary" />
             Loading availability...
           </div>
@@ -396,22 +422,22 @@ export function AvailabilityTimeline({
             <div>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-950">
+                    <h2 className="text-xl font-bold text-[#102D2C]">
                     {availability.resource.name}
                   </h2>
-                  <p className="text-sm text-muted">
+                  <p className="text-sm text-slate-500">
                     {availability.resource.location ?? "Location not specified"}
                   </p>
                 </div>
                 {availability.occupied.length === 0 ? (
-                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
                     <CheckCircle2 aria-hidden="true" className="size-4" />
                     No confirmed reservations
                   </div>
                 ) : null}
               </div>
 
-              <div className="overflow-x-auto rounded-lg border border-border bg-white">
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-[#F8FAF9]">
                 <div className="min-w-[720px] p-4">
                   <div className="relative h-12 border-b border-border">
                     {markers.map((marker) => (
@@ -463,9 +489,8 @@ export function AvailabilityTimeline({
                       );
                     })}
                   </div>
-                  <p className="mt-3 text-xs leading-5 text-muted">
-                    Green areas are free intervals. Teal blocks are confirmed
-                    reservations. Private reservation details are intentionally hidden.
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    Green areas are free intervals. Teal blocks are confirmed reservations. Private reservation details are intentionally hidden.
                   </p>
                 </div>
               </div>
@@ -473,13 +498,13 @@ export function AvailabilityTimeline({
 
             <div className="grid gap-4 lg:grid-cols-2">
               <section>
-                <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-[#087F73]">
                   Free intervals
                 </h3>
                 <div className="mt-3 space-y-2">
                   {availability.free.map((interval, index) => (
                     <div
-                      className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-medium text-emerald-800"
                       key={`${interval.startTime}-${interval.endTime}-${index}`}
                     >
                       {intervalLabel(interval, availability.timeZone)}
@@ -492,18 +517,18 @@ export function AvailabilityTimeline({
               </section>
 
               <section>
-                <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <h3 className="text-sm font-bold uppercase tracking-[0.1em] text-slate-500">
                   Occupied intervals
                 </h3>
                 <div className="mt-3 space-y-2">
                   {availability.occupied.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-muted">
+                    <div className="rounded-xl border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500">
                       No occupied intervals for this date.
                     </div>
                   ) : (
                     availability.occupied.map((interval, index) => (
                       <div
-                        className="rounded-md border border-[#9CC8C3] bg-[#F0FAF8] px-3 py-2 text-sm text-slate-800"
+                        className="rounded-xl border border-[#9CC8C3] bg-[#F0FAF8] px-3 py-3 text-sm font-medium text-slate-800"
                         key={`${interval.startTime}-${interval.endTime}-${index}`}
                       >
                         Busy {intervalLabel(interval, availability.timeZone)}

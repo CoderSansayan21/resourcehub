@@ -18,6 +18,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
+import {
+  getResourceCategory,
+  RESOURCE_CATEGORIES,
+} from "@/lib/resource-categories";
 import { cn } from "@/lib/utils";
 
 type Resource = {
@@ -71,12 +75,14 @@ async function parseResourceResponse(response: Response) {
 }
 
 function valuesFromResource(resource: Resource): ResourceFormValues {
+  const category = getResourceCategory(resource.type);
+
   return {
     capacity: resource.capacity?.toString() ?? "",
     description: resource.description ?? "",
     location: resource.location ?? "",
     name: resource.name,
-    type: resource.type,
+    type: category?.value ?? resource.type,
   };
 }
 
@@ -327,19 +333,33 @@ function ResourceFormModal({
           </div>
 
           <div>
-            <Input
+            <label className="text-sm font-medium text-slate-800" htmlFor="resource-type">
+              Category
+            </label>
+            <select
               aria-invalid={errors.type ? "true" : "false"}
-              autoComplete="off"
+              className="mt-2 h-10 w-full rounded-md border border-border bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
               disabled={saving}
               id="resource-type"
-              label="Type"
-              maxLength={80}
               name="type"
               onChange={(event) => updateField("type", event.target.value)}
-              placeholder="Meeting room"
               required
               value={values.type}
-            />
+            >
+              <option disabled value="">
+                Select a category
+              </option>
+              {RESOURCE_CATEGORIES.map((category) => (
+                <option key={category.value} value={category.value}>
+                  {category.label}
+                </option>
+              ))}
+              {values.type && !getResourceCategory(values.type) ? (
+                <option value={values.type}>
+                  Legacy type: {values.type}
+                </option>
+              ) : null}
+            </select>
             {errors.type ? (
               <p className="mt-2 text-xs text-red-600">{errors.type}</p>
             ) : null}
@@ -532,43 +552,43 @@ function ResourceInventory({
 }) {
   return (
     <>
-      <div className="hidden overflow-hidden rounded-md border border-border lg:block">
-        <table className="min-w-full divide-y divide-border">
-          <thead className="bg-slate-50">
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white lg:block">
+        <table className="min-w-full divide-y divide-slate-200">
+          <thead className="bg-[#F8FAF9]">
             <tr>
               {["Resource", "Type", "Location", "Capacity", "Status"].map(
                 (heading) => (
                   <th
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted"
+                    className="px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.1em] text-slate-500"
                     key={heading}
                   >
                     {heading}
                   </th>
                 ),
               )}
-              <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.1em] text-slate-500">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border bg-white">
+          <tbody className="divide-y divide-slate-200 bg-white">
             {filteredResources.map((resource) => (
               <tr key={resource.id}>
                 <td className="max-w-xs px-4 py-4">
-                  <p className="font-medium text-slate-950">{resource.name}</p>
+                  <p className="font-bold text-[#102D2C]">{resource.name}</p>
                   {resource.description ? (
-                    <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted">
+                    <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
                       {resource.description}
                     </p>
                   ) : null}
                 </td>
-                <td className="px-4 py-4 text-sm text-slate-700">
+                <td className="px-4 py-4 text-sm font-medium text-slate-700">
                   {resource.type}
                 </td>
-                <td className="px-4 py-4 text-sm text-slate-700">
+                <td className="px-4 py-4 text-sm font-medium text-slate-700">
                   {resource.location ?? "Not set"}
                 </td>
-                <td className="px-4 py-4 text-sm text-slate-700">
+                <td className="px-4 py-4 text-sm font-medium text-slate-700">
                   {resource.capacity ?? "Not set"}
                 </td>
                 <td className="px-4 py-4">
@@ -592,7 +612,7 @@ function ResourceInventory({
       <div className="grid gap-3 lg:hidden">
         {filteredResources.map((resource) => (
           <article
-            className="rounded-md border border-border bg-white p-4 shadow-sm"
+            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60"
             key={resource.id}
           >
             <div className="flex items-start justify-between gap-3">
@@ -650,6 +670,7 @@ export function AdminResourceManager() {
   const [success, setSuccess] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [modal, setModal] = useState<{
     mode: ModalMode;
     resource: Resource | null;
@@ -698,15 +719,24 @@ export function AdminResourceManager() {
         statusFilter === "all" ||
         (statusFilter === "active" && resource.isActive) ||
         (statusFilter === "inactive" && !resource.isActive);
+      const typeMatches = typeFilter === "all" || resource.type === typeFilter;
       const queryMatches =
         !normalizedQuery ||
         resource.name.toLowerCase().includes(normalizedQuery) ||
         resource.type.toLowerCase().includes(normalizedQuery) ||
         (resource.location ?? "").toLowerCase().includes(normalizedQuery);
 
-      return statusMatches && queryMatches;
+      return statusMatches && typeMatches && queryMatches;
     });
-  }, [query, resources, statusFilter]);
+  }, [query, resources, statusFilter, typeFilter]);
+
+  const resourceTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(resources.map((resource) => resource.type.trim()).filter(Boolean)),
+      ).sort((left, right) => left.localeCompare(right)),
+    [resources],
+  );
 
   const counts = useMemo(
     () => ({
@@ -777,28 +807,33 @@ export function AdminResourceManager() {
 
   return (
     <section className="space-y-5" aria-labelledby="resource-inventory-title">
-      <Card className="p-0">
-        <div className="border-b border-border p-5">
+      <Card className="overflow-hidden rounded-2xl border-slate-200/90 p-0 shadow-sm shadow-slate-200/70">
+        <div className="border-b border-slate-200/90 bg-white p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#E8F7F3] text-[#087F73]">
+                <PackagePlus aria-hidden="true" className="size-5" />
+              </span>
+              <div>
               <h2
-                className="text-xl font-semibold tracking-tight text-slate-950"
+                className="text-xl font-bold tracking-tight text-[#102D2C]"
                 id="resource-inventory-title"
               >
                 Resource inventory
               </h2>
-              <p className="mt-1 text-sm leading-6 text-muted">
+              <p className="mt-1 text-sm leading-6 text-slate-500">
                 Search, edit, and control member visibility for reservable
                 resources.
               </p>
+              </div>
             </div>
-            <Button onClick={() => setModal({ mode: "create", resource: null })}>
+            <Button className="rounded-xl" onClick={() => setModal({ mode: "create", resource: null })}>
               <PackagePlus aria-hidden="true" className="size-4" />
               Add resource
             </Button>
           </div>
 
-          <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
+          <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
             <div className="relative">
               <Search
                 aria-hidden="true"
@@ -808,7 +843,7 @@ export function AdminResourceManager() {
                 Search resources
               </label>
               <input
-                className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-[#F8FAF9] pl-9 pr-3 text-sm text-[#102D2C] shadow-inner shadow-slate-200/30 placeholder:text-slate-500 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
                 id="resource-search"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search by name, type, or location"
@@ -819,16 +854,16 @@ export function AdminResourceManager() {
 
             <div
               aria-label="Filter resources by status"
-              className="inline-flex rounded-md border border-border bg-white p-1 shadow-sm"
+              className="inline-flex rounded-xl border border-slate-200 bg-[#F8FAF9] p-1 shadow-inner shadow-slate-200/30"
               role="group"
             >
               {(["all", "active", "inactive"] as const).map((filter) => (
                 <button
                   className={cn(
-                    "h-8 rounded px-3 text-sm font-medium capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                    "h-9 rounded-lg px-3 text-sm font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]",
                     statusFilter === filter
-                      ? "bg-primary text-white"
-                      : "text-slate-700 hover:bg-slate-50",
+                      ? "bg-[#087F73] text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white hover:text-[#102D2C]",
                   )}
                   key={filter}
                   onClick={() => setStatusFilter(filter)}
@@ -838,31 +873,50 @@ export function AdminResourceManager() {
                 </button>
               ))}
             </div>
+
+            <div>
+              <label className="sr-only" htmlFor="resource-type-filter">
+                Filter resources by type
+              </label>
+              <select
+                className="h-11 w-full min-w-40 rounded-xl border border-slate-200 bg-[#F8FAF9] px-3 text-sm font-semibold text-[#102D2C] shadow-inner shadow-slate-200/30 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
+                id="resource-type-filter"
+                onChange={(event) => setTypeFilter(event.target.value)}
+                value={typeFilter}
+              >
+                <option value="all">All types</option>
+                {resourceTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-px border-b border-border bg-border sm:grid-cols-3">
-          <div className="bg-slate-50 px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+        <div className="grid gap-px border-b border-slate-200/90 bg-slate-200/90 sm:grid-cols-3">
+          <div className="bg-[#F8FAF9] px-5 py-4">
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">
               Total
             </p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">
+            <p className="mt-1 text-3xl font-bold text-[#102D2C]">
               {counts.total}
             </p>
           </div>
-          <div className="bg-slate-50 px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+          <div className="bg-[#F8FAF9] px-5 py-4">
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">
               Active
             </p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">
+            <p className="mt-1 text-3xl font-bold text-[#087F73]">
               {counts.active}
             </p>
           </div>
-          <div className="bg-slate-50 px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+          <div className="bg-[#F8FAF9] px-5 py-4">
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-slate-500">
               Inactive
             </p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">
+            <p className="mt-1 text-3xl font-bold text-slate-600">
               {counts.inactive}
             </p>
           </div>
@@ -903,7 +957,7 @@ export function AdminResourceManager() {
           </div>
         ) : null}
 
-        <div className="p-5">
+        <div className="bg-[#F8FAF9]/65 p-5 sm:p-6">
           {loading ? (
             <div className="space-y-3">
               {[0, 1, 2].map((item) => (
@@ -932,6 +986,7 @@ export function AdminResourceManager() {
                   onClick={() => {
                     setQuery("");
                     setStatusFilter("all");
+                    setTypeFilter("all");
                   }}
                   variant="secondary"
                 >

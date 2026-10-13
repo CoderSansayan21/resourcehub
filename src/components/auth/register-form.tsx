@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, UserPlus } from "lucide-react";
+import { ArrowRight, LoaderCircle, Lock, Mail, UserRound } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,19 +103,22 @@ export function RegisterForm() {
   }
 
   return (
-    <form className="space-y-5" onSubmit={handleSubmit}>
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-          Create account
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
+          Get started
+        </p>
+        <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#063B3A]">
+          Create your account
         </h2>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          Public registration creates a member account for ResourceHub.
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          A better way to book your workspace starts here.
         </p>
       </div>
 
       {errors.form ? (
         <div
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800"
+          className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800"
           role="alert"
         >
           {errors.form}
@@ -124,9 +127,11 @@ export function RegisterForm() {
 
       <TextField
         autoComplete="name"
+        className="h-12 rounded-xl border-slate-300 bg-white"
         disabled={isPending}
         error={errors.name}
         label="Full name"
+        leadingIcon={<UserRound aria-hidden="true" className="size-4" />}
         name="name"
         onChange={(event) => {
           setName(event.target.value);
@@ -139,10 +144,12 @@ export function RegisterForm() {
 
       <TextField
         autoComplete="email"
+        className="h-12 rounded-xl border-slate-300 bg-white"
         disabled={isPending}
         error={errors.email}
         inputMode="email"
         label="Email"
+        leadingIcon={<Mail aria-hidden="true" className="size-4" />}
         name="email"
         onChange={(event) => {
           setEmail(event.target.value);
@@ -155,10 +162,12 @@ export function RegisterForm() {
 
       <PasswordField
         autoComplete="new-password"
+        className="h-12 rounded-xl border-slate-300 bg-white"
         disabled={isPending}
         error={errors.password}
         isVisible={showPassword}
         label="Password"
+        leadingIcon={<Lock aria-hidden="true" className="size-4" />}
         name="password"
         onChange={(event) => {
           setPassword(event.target.value);
@@ -171,13 +180,18 @@ export function RegisterForm() {
         onToggleVisibility={() => setShowPassword((current) => !current)}
         value={password}
       />
+      <p className="-mt-2 text-xs leading-5 text-slate-500">
+        Use at least 8 characters. Choose a password that is hard to guess.
+      </p>
 
       <PasswordField
         autoComplete="new-password"
+        className="h-12 rounded-xl border-slate-300 bg-white"
         disabled={isPending}
         error={errors.confirmPassword}
         isVisible={showConfirmPassword}
         label="Confirm password"
+        leadingIcon={<Lock aria-hidden="true" className="size-4" />}
         name="confirmPassword"
         onChange={(event) => {
           setConfirmPassword(event.target.value);
@@ -193,19 +207,26 @@ export function RegisterForm() {
         value={confirmPassword}
       />
 
-      <Button className="h-11 w-full" disabled={isPending} type="submit">
+      <Button
+        className="group mt-2 h-12 w-full shadow-lg shadow-teal-950/15 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-teal-950/20"
+        disabled={isPending}
+        type="submit"
+      >
         {isPending ? (
           <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
         ) : (
-          <UserPlus aria-hidden="true" className="size-4" />
+          <ArrowRight
+            aria-hidden="true"
+            className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
+          />
         )}
         {isPending ? "Creating account..." : "Create member account"}
       </Button>
 
-      <p className="text-center text-sm text-muted">
+      <p className="pt-1 text-center text-sm text-slate-600">
         Already have an account?{" "}
         <Link
-          className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="font-semibold text-primary underline-offset-4 transition hover:text-[#063B3A] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           href="/login"
         >
           Sign in

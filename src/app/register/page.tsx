@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { AuthShell } from "@/components/auth/auth-shell";
 import { RegisterForm } from "@/components/auth/register-form";
+import { RegisterShell } from "@/components/auth/register-shell";
 import { auth } from "@/lib/auth";
 
 export const instant = false;
@@ -16,13 +16,8 @@ export default async function RegisterPage() {
   }
 
   return (
-    <AuthShell
-      description="Create a member account to browse workplace resources and prepare reservations in a clean, focused dashboard."
-      eyebrow="Member registration"
-      footer="Already registered users are sent directly to the dashboard."
-      title="Start booking shared resources."
-    >
+    <RegisterShell>
       <RegisterForm />
-    </AuthShell>
+    </RegisterShell>
   );
 }

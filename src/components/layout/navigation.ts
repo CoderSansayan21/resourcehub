@@ -1,6 +1,7 @@
 import {
   BarChart3,
   CalendarDays,
+  ClipboardList,
   Clock3,
   LayoutDashboard,
   Settings,
@@ -34,13 +35,32 @@ export const navigationItems = [
   },
 ];
 
-export const navigationGroups = [
+export const memberNavigationGroups = [
   {
     label: "Workspace",
     items: navigationItems.slice(0, 4),
   },
+];
+
+export const adminNavigationGroups = [
   {
-    label: "Operations",
-    items: navigationItems.slice(4),
+    label: "Workspace management",
+    items: [
+      navigationItems[0],
+      {
+        label: "Manage Resources",
+        href: "/admin",
+        icon: Settings,
+      },
+      {
+        label: "Manage Reservations",
+        href: "/reservations",
+        icon: ClipboardList,
+      },
+    ],
   },
 ];
+
+export function getNavigationGroups(role: "ADMIN" | "MEMBER") {
+  return role === "ADMIN" ? adminNavigationGroups : memberNavigationGroups;
+}

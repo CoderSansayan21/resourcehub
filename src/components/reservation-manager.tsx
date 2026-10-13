@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -175,6 +176,44 @@ function StatusBadge({ reservation }: { reservation: Reservation }) {
       />
       {statusLabel(reservation)}
     </Badge>
+  );
+}
+
+function ReservationStats({ reservations }: { reservations: Reservation[] }) {
+  const now = new Date();
+  const counts = reservations.reduce(
+    (summary, reservation) => {
+      if (reservation.status === "CANCELLED") {
+        summary.cancelled += 1;
+      } else if (new Date(reservation.startTime) > now) {
+        summary.upcoming += 1;
+      } else {
+        summary.past += 1;
+      }
+
+      return summary;
+    },
+    { cancelled: 0, past: 0, upcoming: 0 },
+  );
+
+  const cards = [
+    { label: "Total reservations", tone: "text-[#102D2C]", value: reservations.length },
+    { label: "Upcoming", tone: "text-[#087F73]", value: counts.upcoming },
+    { label: "Past", tone: "text-blue-700", value: counts.past },
+    { label: "Cancelled", tone: "text-slate-600", value: counts.cancelled },
+  ];
+
+  return (
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Reservation statistics">
+      {cards.map((card) => (
+        <Card className="rounded-2xl border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/70" key={card.label}>
+          <p className="text-sm font-semibold text-slate-500">{card.label}</p>
+          <p className={cn("mt-3 text-3xl font-bold tracking-tight", card.tone)}>
+            {card.value.toLocaleString("en")}
+          </p>
+        </Card>
+      ))}
+    </section>
   );
 }
 
@@ -611,14 +650,14 @@ function ReservationCard({
   const editable = canMutate(reservation, currentUserId);
 
   return (
-    <article className="flex h-full flex-col rounded-lg border border-border bg-white p-5 shadow-sm shadow-slate-200/70">
+    <article className="group flex h-full flex-col rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/70 transition duration-200 hover:-translate-y-0.5 hover:border-[#B5D2CE] hover:shadow-md hover:shadow-teal-950/10">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <StatusBadge reservation={reservation} />
-          <h2 className="mt-3 text-lg font-semibold tracking-tight text-slate-950">
+          <h2 className="mt-3 text-lg font-bold tracking-tight text-[#102D2C]">
             {reservation.title}
           </h2>
-          <p className="mt-1 text-sm font-medium text-primary">
+          <p className="mt-1 text-sm font-semibold text-[#087F73]">
             {reservation.resource.name}
           </p>
         </div>
@@ -630,13 +669,13 @@ function ReservationCard({
             Date and time
           </dt>
           <dd className="mt-1 text-slate-800">
-            {formatDate(reservation.startTime)} ·{" "}
+            {formatDate(reservation.startTime)} &middot;{" "}
             {formatTimeRange(reservation.startTime, reservation.endTime)}
           </dd>
         </div>
         {reservation.resource.location ? (
-          <div className="flex gap-2 text-slate-700">
-            <MapPin aria-hidden="true" className="mt-0.5 size-4 text-muted" />
+          <div className="flex gap-2 text-sm text-slate-700">
+            <MapPin aria-hidden="true" className="mt-0.5 size-4 text-[#087F73]" />
             <dt className="sr-only">Location</dt>
             <dd>{reservation.resource.location}</dd>
           </div>
@@ -653,7 +692,7 @@ function ReservationCard({
         ) : null}
       </dl>
 
-      <div className="mt-auto flex flex-wrap gap-2 pt-5">
+      <div className="mt-auto flex flex-wrap gap-2 border-t border-slate-100 pt-5">
         <Button
           onClick={() => onView(reservation)}
           size="sm"
@@ -686,6 +725,108 @@ function ReservationCard({
         ) : null}
       </div>
     </article>
+  );
+}
+
+function AdminReservationTable({
+  currentUserId,
+  onCancel,
+  onEdit,
+  onView,
+  reservations,
+}: {
+  currentUserId: string;
+  onCancel: (reservation: Reservation) => void;
+  onEdit: (reservation: Reservation) => void;
+  onView: (reservation: Reservation) => void;
+  reservations: Reservation[];
+}) {
+  return (
+    <>
+      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white lg:block">
+        <table className="min-w-full divide-y divide-slate-200">
+          <thead className="bg-[#F8FAF9]">
+            <tr>
+              {['Reservation', 'Resource', 'Booked by', 'Date', 'Time', 'Status', 'Actions'].map((heading) => (
+                <th
+                  className={cn(
+                    "px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.1em] text-slate-500",
+                    heading === "Actions" && "text-right",
+                  )}
+                  key={heading}
+                  scope="col"
+                >
+                  {heading}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 bg-white">
+            {reservations.map((reservation) => {
+              const editable = canMutate(reservation, currentUserId);
+
+              return (
+                <tr className="transition hover:bg-[#F8FAF9]" key={reservation.id}>
+                  <td className="max-w-48 px-4 py-4">
+                    <p className="truncate font-bold text-[#102D2C]">{reservation.title}</p>
+                    <p className="mt-1 truncate text-xs text-slate-500">{reservation.id}</p>
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="font-semibold text-[#087F73]">{reservation.resource.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">{reservation.resource.type}</p>
+                  </td>
+                  <td className="max-w-40 px-4 py-4 text-xs text-slate-600">
+                    <span className="break-all">{reservation.userId}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-4 text-sm font-medium text-slate-700">
+                    {formatDate(reservation.startTime)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-4 text-sm font-medium text-slate-700">
+                    {formatTimeRange(reservation.startTime, reservation.endTime)}
+                  </td>
+                  <td className="px-4 py-4">
+                    <StatusBadge reservation={reservation} />
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex justify-end gap-2">
+                      <Button onClick={() => onView(reservation)} size="sm" type="button" variant="secondary">
+                        <Eye aria-hidden="true" className="size-4" />
+                        View
+                      </Button>
+                      {editable ? (
+                        <>
+                          <Button onClick={() => onEdit(reservation)} size="sm" type="button" variant="secondary">
+                            <Pencil aria-hidden="true" className="size-4" />
+                            Edit
+                          </Button>
+                          <Button onClick={() => onCancel(reservation)} size="sm" type="button" variant="ghost">
+                            Cancel
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid gap-3 lg:hidden">
+        {reservations.map((reservation) => (
+          <ReservationCard
+            currentUserId={currentUserId}
+            key={reservation.id}
+            onCancel={onCancel}
+            onEdit={onEdit}
+            onView={onView}
+            reservation={reservation}
+            userRole="ADMIN"
+          />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -779,31 +920,41 @@ export function ReservationManager({
     });
   }, [filter, query, reservations]);
 
+  const isAdmin = userRole === "ADMIN";
+
   return (
     <section className="space-y-5" aria-labelledby="reservation-list-title">
-      <Card className="p-0">
-        <div className="border-b border-border p-5">
+      {isAdmin ? <ReservationStats reservations={reservations} /> : null}
+      <Card className="overflow-hidden rounded-2xl border-slate-200/90 p-0 shadow-sm shadow-slate-200/70">
+        <div className="border-b border-slate-200/90 bg-white p-5 sm:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2
-                className="text-xl font-semibold tracking-tight text-slate-950"
-                id="reservation-list-title"
-              >
-                {userRole === "ADMIN" ? "All reservations" : "Reservation history"}
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-muted">
-                {userRole === "ADMIN"
-                  ? "Inspect bookings across the workspace. Mutations are only available on reservations you own."
-                  : "Manage upcoming reservations and review past or cancelled bookings."}
-              </p>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#E8F7F3] text-[#087F73]">
+                <CalendarClock aria-hidden="true" className="size-5" />
+              </span>
+              <div>
+                <h2
+                  className="text-xl font-bold tracking-tight text-[#102D2C]"
+                  id="reservation-list-title"
+                >
+                  {isAdmin ? "All reservations" : "Reservation history"}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  {isAdmin
+                    ? "View and monitor reservation activity across ResourceHub."
+                    : "Manage upcoming reservations and review past or cancelled bookings."}
+                </p>
+              </div>
             </div>
-            <Link
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-              href="/resources"
-            >
-              <CalendarClock aria-hidden="true" className="size-4" />
-              Book a resource
-            </Link>
+            {!isAdmin ? (
+              <Link
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#087F73] px-4 text-sm font-semibold text-white shadow-sm shadow-teal-950/10 transition hover:bg-[#066B62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]"
+                href="/resources"
+              >
+                <CalendarClock aria-hidden="true" className="size-4" />
+                Book a resource
+              </Link>
+            ) : null}
           </div>
 
           <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]">
@@ -816,7 +967,7 @@ export function ReservationManager({
                 Search reservations
               </label>
               <input
-                className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-primary focus:outline-2 focus:outline-offset-2 focus:outline-primary"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-[#F8FAF9] pl-10 pr-3 text-sm text-[#102D2C] shadow-inner shadow-slate-200/30 placeholder:text-slate-500 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
                 id="reservation-search"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search by title, resource, type, or location"
@@ -827,16 +978,16 @@ export function ReservationManager({
 
             <div
               aria-label="Filter reservations"
-              className="inline-flex overflow-x-auto rounded-md border border-border bg-white p-1 shadow-sm"
+              className="inline-flex overflow-x-auto rounded-xl border border-slate-200 bg-[#F8FAF9] p-1 shadow-inner shadow-slate-200/30"
               role="group"
             >
               {(["all", "upcoming", "past", "cancelled"] as const).map((item) => (
                 <button
                   className={cn(
-                    "h-8 whitespace-nowrap rounded px-3 text-sm font-medium capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                    "h-9 whitespace-nowrap rounded-lg px-3 text-sm font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]",
                     filter === item
-                      ? "bg-primary text-white"
-                      : "text-slate-700 hover:bg-slate-50",
+                      ? "bg-[#087F73] text-white shadow-sm"
+                      : "text-slate-600 hover:bg-white hover:text-[#102D2C]",
                   )}
                   key={item}
                   onClick={() => setFilter(item)}
@@ -882,34 +1033,44 @@ export function ReservationManager({
           </div>
         ) : null}
 
-        <div className="p-5">
+        <div className="bg-[#F8FAF9]/65 p-5 sm:p-6">
           {refreshing && reservations.length === 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className={isAdmin ? "space-y-3" : "grid gap-4 md:grid-cols-2 xl:grid-cols-3"}>
               {[0, 1, 2].map((item) => (
                 <div
-                  className="h-64 animate-pulse rounded-lg border border-border bg-slate-100"
+                  className={isAdmin ? "h-16 animate-pulse rounded-xl border border-slate-200 bg-slate-100" : "h-64 animate-pulse rounded-lg border border-border bg-slate-100"}
                   key={item}
                 />
               ))}
             </div>
           ) : reservations.length === 0 ? (
-            <EmptyState
-              action={
-                <Link
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-white px-4 text-sm font-medium text-slate-800 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  href="/resources"
-                >
-                  Browse resources
-                </Link>
-              }
-              description={
-                userRole === "ADMIN"
-                  ? "No reservations exist yet."
-                  : "You do not have any reservations yet. Book an active resource to get started."
-              }
-              icon={CalendarClock}
-              title="No reservations to show"
-            />
+            isAdmin ? (
+              <EmptyState
+                description="Member reservations will appear here once resources are booked."
+                icon={CalendarClock}
+                title="No reservations yet"
+              />
+            ) : (
+            <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#B5D2CE] bg-white px-6 py-10 text-center">
+              <Image
+                alt="An empty calendar illustration"
+                className="h-auto w-44 object-contain sm:w-52"
+                height={512}
+                src="/images/reservations/reservations-empty.png"
+                width={512}
+              />
+              <h2 className="mt-5 text-xl font-bold text-[#102D2C]">No reservations to show</h2>
+              <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+                You do not have any reservations yet. Book an active resource to get started.
+              </p>
+              <Link
+                className="mt-6 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#087F73] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#066B62] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]"
+                href="/resources"
+              >
+                Browse resources
+              </Link>
+            </div>
+            )
           ) : filteredReservations.length === 0 ? (
             <EmptyState
               action={
@@ -928,6 +1089,14 @@ export function ReservationManager({
               description="Try another keyword or status filter."
               icon={Search}
               title="No matching reservations"
+            />
+          ) : isAdmin ? (
+            <AdminReservationTable
+              currentUserId={currentUserId}
+              onCancel={setCancelling}
+              onEdit={setEditing}
+              onView={setViewing}
+              reservations={filteredReservations}
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

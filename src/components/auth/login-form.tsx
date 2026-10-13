@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, LogIn } from "lucide-react";
+import { ArrowRight, LoaderCircle, Lock, Mail } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,17 +84,20 @@ export function LoginForm() {
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-          Sign in
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
+          Secure sign in
+        </p>
+        <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#102D2C]">
+          Welcome back
         </h2>
-        <p className="mt-2 text-sm leading-6 text-muted">
-          Use your ResourceHub member account to continue.
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Sign in to your ResourceHub account.
         </p>
       </div>
 
       {errors.form ? (
         <div
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-800"
+          className="rounded-xl border border-red-200/70 bg-red-50/92 px-3 py-2 text-sm leading-6 text-red-800 shadow-sm"
           role="alert"
         >
           {errors.form}
@@ -103,10 +106,13 @@ export function LoginForm() {
 
       <TextField
         autoComplete="email"
+        className="h-12 rounded-xl border-slate-300 bg-white text-[#102D2C] shadow-sm focus:bg-white"
         disabled={isPending}
         error={errors.email}
         inputMode="email"
         label="Email"
+        labelClassName="text-[#102D2C] font-semibold"
+        leadingIcon={<Mail aria-hidden="true" className="size-4" />}
         name="email"
         onChange={(event) => {
           setEmail(event.target.value);
@@ -119,10 +125,13 @@ export function LoginForm() {
 
       <PasswordField
         autoComplete="current-password"
+        className="h-12 rounded-xl border-slate-300 bg-white text-[#102D2C] shadow-sm focus:bg-white"
         disabled={isPending}
         error={errors.password}
         isVisible={showPassword}
         label="Password"
+        labelClassName="text-[#102D2C] font-semibold"
+        leadingIcon={<Lock aria-hidden="true" className="size-4" />}
         name="password"
         onChange={(event) => {
           setPassword(event.target.value);
@@ -136,22 +145,29 @@ export function LoginForm() {
         value={password}
       />
 
-      <Button className="h-11 w-full" disabled={isPending} type="submit">
+      <Button
+        className="group h-12 w-full shadow-lg shadow-black/20 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/24"
+        disabled={isPending}
+        type="submit"
+      >
         {isPending ? (
           <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
         ) : (
-          <LogIn aria-hidden="true" className="size-4" />
+          <ArrowRight
+            aria-hidden="true"
+            className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
+          />
         )}
         {isPending ? "Signing in..." : "Sign in"}
       </Button>
 
-      <p className="text-center text-sm text-muted">
-        Need an account?{" "}
+      <p className="text-center text-sm text-slate-600">
+        New to ResourceHub?{" "}
         <Link
-          className="font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="font-semibold text-primary underline-offset-4 transition hover:text-[#063B3A] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           href="/register"
         >
-          Create one
+          Create an account
         </Link>
       </p>
     </form>
