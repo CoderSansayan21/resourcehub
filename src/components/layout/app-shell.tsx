@@ -277,7 +277,7 @@ export function AppShell({ children, user }: AppShellProps) {
             <div className="flex items-center gap-2">
               <div className="hidden h-9 w-64 items-center gap-2 rounded-md border border-border bg-slate-50 px-3 text-sm text-muted md:flex">
                 <Search aria-hidden="true" className="size-4" />
-                <span>Search resources soon</span>
+                <span>ResourceHub</span>
               </div>
               <UserRound aria-hidden="true" className="hidden size-4 text-muted sm:block" />
               <HeaderAccountBadge user={user} />
