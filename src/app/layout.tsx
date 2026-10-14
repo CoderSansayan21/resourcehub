@@ -15,6 +15,24 @@ const manrope = Manrope({
 export const metadata: Metadata = {
   title: "ResourceHub",
   description: "Resource Reservation Management System",
+  icons: {
+    icon: [{ url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" }],
+    apple: [{ url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+    other: [
+      {
+        rel: "icon",
+        url: "/icon-192.png",
+        type: "image/png",
+        sizes: "192x192",
+      },
+      {
+        rel: "icon",
+        url: "/favicon-resourcehub.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
