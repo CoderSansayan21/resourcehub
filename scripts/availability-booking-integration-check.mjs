@@ -54,4 +54,9 @@ assert.match(source.availabilityTimeline, /params\.set\("date", nextDate\)/);
 assert.match(source.availabilityTimeline, /href=\{`\/resources\/\$\{selectedResource\.id\}\?date=\$\{date\}`\}/);
 record("Availability selection is URL-addressable and links to the selected resource/date");
 
+assert.match(source.availabilityTimeline, /RESOURCEHUB_TIME_ZONE = "Asia\/Colombo"/);
+assert.match(source.availabilityTimeline, /useState\(RESOURCEHUB_TIME_ZONE\)/);
+assert.doesNotMatch(source.availabilityTimeline, /resolvedOptions\(\)\.timeZone/);
+record("Availability uses the ResourceHub Asia/Colombo timezone instead of the browser timezone");
+
 console.log(JSON.stringify({ passed }, null, 2));

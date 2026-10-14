@@ -282,28 +282,28 @@ export async function getResourceAvailability({
     throw new AvailabilityOperationError(404, "Resource was not found.");
   }
 
-  const reservations = await prisma.$queryRaw<
-    Array<{ endMs: number; startMs: number }>
-  >`
-    SELECT
-      (extract(epoch from "startTime") * 1000)::double precision AS "startMs",
-      (extract(epoch from "endTime") * 1000)::double precision AS "endMs"
-    FROM "Reservation"
-    WHERE "resourceId" = ${resourceId}::uuid
-      AND "status" = ${ReservationStatus.CONFIRMED}::"ReservationStatus"
-      AND "endTime" > ${dayStart.toISOString()}::timestamptz
-      AND "startTime" < ${dayEnd.toISOString()}::timestamptz
-    ORDER BY "startTime" ASC, "endTime" ASC
-  `;
+  const reservations = await prisma.reservation.findMany({
+    orderBy: [{ startTime: "asc" }, { endTime: "asc" }],
+    select: {
+      endTime: true,
+      startTime: true,
+    },
+    where: {
+      endTime: { gt: dayStart },
+      resourceId,
+      startTime: { lt: dayEnd },
+      status: ReservationStatus.CONFIRMED,
+    },
+  });
 
   const occupied = reservations.map((reservation) => ({
     endTime:
-      reservation.endMs < dayEnd.getTime()
-        ? new Date(reservation.endMs)
+      reservation.endTime.getTime() < dayEnd.getTime()
+        ? reservation.endTime
         : dayEnd,
     startTime:
-      reservation.startMs > dayStart.getTime()
-        ? new Date(reservation.startMs)
+      reservation.startTime.getTime() > dayStart.getTime()
+        ? reservation.startTime
         : dayStart,
   }));
 

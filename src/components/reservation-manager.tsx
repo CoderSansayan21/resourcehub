@@ -44,6 +44,11 @@ type Reservation = {
   status: ReservationStatus;
   title: string;
   updatedAt: string;
+  user: {
+    email: string;
+    id: string;
+    name: string;
+  };
   userId: string;
 };
 
@@ -53,7 +58,8 @@ type ApiResponse = {
   reservations?: Reservation[];
 };
 
-type FilterValue = "all" | "upcoming" | "past" | "cancelled";
+type FilterValue = "all" | "upcoming" | "ongoing" | "past" | "cancelled";
+type TemporalState = "ongoing" | "past" | "upcoming";
 
 type EditValues = {
   endTime: string;
@@ -133,48 +139,85 @@ function getTimezoneLabel() {
   return `${zone}${offset ? ` (${offset})` : ""}`;
 }
 
-function getBucket(reservation: Reservation) {
+function getTemporalState(reservation: Reservation, now = new Date()): TemporalState {
+  const start = new Date(reservation.startTime);
+  const end = new Date(reservation.endTime);
+
+  if (start > now) return "upcoming";
+  if (end <= now) return "past";
+  return "ongoing";
+}
+
+function getFilterBucket(reservation: Reservation, now = new Date()): FilterValue {
   if (reservation.status === "CANCELLED") return "cancelled";
-  return new Date(reservation.endTime) <= new Date() ? "past" : "upcoming";
+  return getTemporalState(reservation, now);
 }
 
 function canMutate(reservation: Reservation, currentUserId: string) {
   return (
     reservation.userId === currentUserId &&
     reservation.status === "CONFIRMED" &&
-    new Date(reservation.startTime) > new Date()
+    getTemporalState(reservation) === "upcoming"
   );
 }
 
-function statusLabel(reservation: Reservation) {
-  const bucket = getBucket(reservation);
-  if (bucket === "cancelled") return "Cancelled";
-  if (bucket === "past") return "Past";
-  return "Upcoming";
+function canCancel(reservation: Reservation, currentUserId: string, userRole: UserRole) {
+  return (
+    reservation.status === "CONFIRMED" &&
+    getTemporalState(reservation) === "upcoming" &&
+    (userRole === "ADMIN" || reservation.userId === currentUserId)
+  );
 }
 
 function StatusBadge({ reservation }: { reservation: Reservation }) {
-  const bucket = getBucket(reservation);
+  const cancelled = reservation.status === "CANCELLED";
   return (
     <Badge
       className={cn(
         "gap-1.5",
-        bucket === "upcoming" && "border-emerald-200 bg-emerald-50 text-emerald-700",
-        bucket === "past" && "border-blue-200 bg-blue-50 text-blue-700",
-        bucket === "cancelled" && "border-slate-200 bg-slate-100 text-slate-600",
+        cancelled
+          ? "border-slate-200 bg-slate-100 text-slate-600"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700",
       )}
-      variant={bucket === "upcoming" ? "green" : bucket === "past" ? "blue" : "slate"}
+      variant={cancelled ? "slate" : "green"}
     >
       <span
         aria-hidden="true"
         className={cn(
           "size-1.5 rounded-full",
-          bucket === "upcoming" && "bg-emerald-500",
-          bucket === "past" && "bg-blue-500",
-          bucket === "cancelled" && "bg-slate-400",
+          cancelled ? "bg-slate-400" : "bg-emerald-500",
         )}
       />
-      {statusLabel(reservation)}
+      {cancelled ? "Cancelled" : "Confirmed"}
+    </Badge>
+  );
+}
+
+function TemporalBadge({ reservation }: { reservation: Reservation }) {
+  if (reservation.status === "CANCELLED") return null;
+
+  const temporalState = getTemporalState(reservation);
+
+  return (
+    <Badge
+      className={cn(
+        "gap-1.5",
+        temporalState === "upcoming" && "border-teal-200 bg-teal-50 text-teal-700",
+        temporalState === "ongoing" && "border-amber-200 bg-amber-50 text-amber-700",
+        temporalState === "past" && "border-blue-200 bg-blue-50 text-blue-700",
+      )}
+      variant={temporalState === "past" ? "blue" : temporalState === "upcoming" ? "green" : "slate"}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-1.5 rounded-full",
+          temporalState === "upcoming" && "bg-teal-500",
+          temporalState === "ongoing" && "bg-amber-500",
+          temporalState === "past" && "bg-blue-500",
+        )}
+      />
+      {temporalState === "upcoming" ? "Upcoming" : temporalState === "ongoing" ? "Ongoing" : "Past"}
     </Badge>
   );
 }
@@ -185,26 +228,26 @@ function ReservationStats({ reservations }: { reservations: Reservation[] }) {
     (summary, reservation) => {
       if (reservation.status === "CANCELLED") {
         summary.cancelled += 1;
-      } else if (new Date(reservation.startTime) > now) {
-        summary.upcoming += 1;
       } else {
-        summary.past += 1;
+        const temporalState = getTemporalState(reservation, now);
+        summary[temporalState] += 1;
       }
 
       return summary;
     },
-    { cancelled: 0, past: 0, upcoming: 0 },
+    { cancelled: 0, ongoing: 0, past: 0, upcoming: 0 },
   );
 
   const cards = [
     { label: "Total reservations", tone: "text-[#102D2C]", value: reservations.length },
     { label: "Upcoming", tone: "text-[#087F73]", value: counts.upcoming },
+    { label: "Ongoing", tone: "text-amber-700", value: counts.ongoing },
     { label: "Past", tone: "text-blue-700", value: counts.past },
     { label: "Cancelled", tone: "text-slate-600", value: counts.cancelled },
   ];
 
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Reservation statistics">
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Reservation statistics">
       {cards.map((card) => (
         <Card className="rounded-2xl border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/70" key={card.label}>
           <p className="text-sm font-semibold text-slate-500">{card.label}</p>
@@ -298,7 +341,10 @@ function DetailDialog({
       <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-lg bg-white p-5 shadow-xl sm:max-w-2xl sm:rounded-lg sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <StatusBadge reservation={reservation} />
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge reservation={reservation} />
+              <TemporalBadge reservation={reservation} />
+            </div>
             <h2
               className="mt-3 text-xl font-semibold tracking-tight text-slate-950"
               id="reservation-detail-title"
@@ -357,8 +403,11 @@ function DetailDialog({
 
         {userRole === "ADMIN" ? (
           <p className="mt-5 rounded-md border border-[#B5D2CE] bg-[#F0FAF8] px-3 py-2 text-sm text-slate-700">
-            Admin inspection view. This reservation is{" "}
-            {reservation.userId === currentUserId ? "owned by you" : "owned by another user"}.
+            Admin inspection view. Booked by{" "}
+            {reservation.userId === currentUserId
+              ? "you"
+              : `${reservation.user.name} (${reservation.user.email})`}
+            .
           </p>
         ) : null}
       </div>
@@ -602,8 +651,14 @@ function CancelDialog({
           Cancel this reservation?
         </h2>
         <p className="mt-3 text-sm leading-6 text-muted">
-          {reservation.title} will be marked cancelled and remain visible in your
-          reservation history.
+          This will mark the booking for {reservation.resource.name} on{" "}
+          {formatDate(reservation.startTime)} from{" "}
+          {formatTimeRange(reservation.startTime, reservation.endTime)} as cancelled.
+          The record will remain visible, but the time slot will become available
+          for new reservations.
+        </p>
+        <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold leading-6 text-red-700">
+          Confirm only if this reservation should no longer be honored.
         </p>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button
@@ -648,12 +703,16 @@ function ReservationCard({
   userRole: UserRole;
 }) {
   const editable = canMutate(reservation, currentUserId);
+  const cancellable = canCancel(reservation, currentUserId, userRole);
 
   return (
     <article className="group flex h-full flex-col rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-200/70 transition duration-200 hover:-translate-y-0.5 hover:border-[#B5D2CE] hover:shadow-md hover:shadow-teal-950/10">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <StatusBadge reservation={reservation} />
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge reservation={reservation} />
+            <TemporalBadge reservation={reservation} />
+          </div>
           <h2 className="mt-3 text-lg font-bold tracking-tight text-[#102D2C]">
             {reservation.title}
           </h2>
@@ -686,7 +745,9 @@ function ReservationCard({
               Owner
             </dt>
             <dd className="mt-1 break-all text-slate-700">
-              {reservation.userId === currentUserId ? "You" : reservation.userId}
+              {reservation.userId === currentUserId
+                ? "You"
+                : `${reservation.user.name} (${reservation.user.email})`}
             </dd>
           </div>
         ) : null}
@@ -713,15 +774,17 @@ function ReservationCard({
               <Pencil aria-hidden="true" className="size-4" />
               Reschedule
             </Button>
-            <Button
-              onClick={() => onCancel(reservation)}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              Cancel
-            </Button>
           </>
+        ) : null}
+        {cancellable ? (
+          <Button
+            onClick={() => onCancel(reservation)}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            Cancel
+          </Button>
         ) : null}
       </div>
     </article>
@@ -741,6 +804,8 @@ function AdminReservationTable({
   onView: (reservation: Reservation) => void;
   reservations: Reservation[];
 }) {
+  const userRole: UserRole = "ADMIN";
+
   return (
     <>
       <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white lg:block">
@@ -764,6 +829,7 @@ function AdminReservationTable({
           <tbody className="divide-y divide-slate-200 bg-white">
             {reservations.map((reservation) => {
               const editable = canMutate(reservation, currentUserId);
+              const cancellable = canCancel(reservation, currentUserId, userRole);
 
               return (
                 <tr className="transition hover:bg-[#F8FAF9]" key={reservation.id}>
@@ -776,7 +842,12 @@ function AdminReservationTable({
                     <p className="mt-1 text-xs text-slate-500">{reservation.resource.type}</p>
                   </td>
                   <td className="max-w-40 px-4 py-4 text-xs text-slate-600">
-                    <span className="break-all">{reservation.userId}</span>
+                    <p className="font-semibold text-slate-800">
+                      {reservation.user.name}
+                    </p>
+                    <p className="mt-1 break-all text-slate-500">
+                      {reservation.user.email}
+                    </p>
                   </td>
                   <td className="whitespace-nowrap px-4 py-4 text-sm font-medium text-slate-700">
                     {formatDate(reservation.startTime)}
@@ -785,7 +856,10 @@ function AdminReservationTable({
                     {formatTimeRange(reservation.startTime, reservation.endTime)}
                   </td>
                   <td className="px-4 py-4">
-                    <StatusBadge reservation={reservation} />
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge reservation={reservation} />
+                      <TemporalBadge reservation={reservation} />
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex justify-end gap-2">
@@ -803,6 +877,11 @@ function AdminReservationTable({
                             Cancel
                           </Button>
                         </>
+                      ) : null}
+                      {!editable && cancellable ? (
+                        <Button onClick={() => onCancel(reservation)} size="sm" type="button" variant="ghost">
+                          Cancel
+                        </Button>
                       ) : null}
                     </div>
                   </td>
@@ -822,7 +901,7 @@ function AdminReservationTable({
             onEdit={onEdit}
             onView={onView}
             reservation={reservation}
-            userRole="ADMIN"
+            userRole={userRole}
           />
         ))}
       </div>
@@ -907,14 +986,16 @@ export function ReservationManager({
     const normalizedQuery = query.trim().toLowerCase();
 
     return reservations.filter((reservation) => {
-      const bucket = getBucket(reservation);
+      const bucket = getFilterBucket(reservation);
       const filterMatches = filter === "all" || bucket === filter;
       const queryMatches =
         !normalizedQuery ||
         reservation.title.toLowerCase().includes(normalizedQuery) ||
         reservation.resource.name.toLowerCase().includes(normalizedQuery) ||
         reservation.resource.type.toLowerCase().includes(normalizedQuery) ||
-        (reservation.resource.location ?? "").toLowerCase().includes(normalizedQuery);
+        (reservation.resource.location ?? "").toLowerCase().includes(normalizedQuery) ||
+        reservation.user.name.toLowerCase().includes(normalizedQuery) ||
+        reservation.user.email.toLowerCase().includes(normalizedQuery);
 
       return filterMatches && queryMatches;
     });
@@ -970,7 +1051,7 @@ export function ReservationManager({
                 className="h-11 w-full rounded-xl border border-slate-200 bg-[#F8FAF9] pl-10 pr-3 text-sm text-[#102D2C] shadow-inner shadow-slate-200/30 placeholder:text-slate-500 focus:border-[#087F73] focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-[#087F73]"
                 id="reservation-search"
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search by title, resource, type, or location"
+                placeholder="Search by title, resource, member, type, or location"
                 type="search"
                 value={query}
               />
@@ -981,7 +1062,7 @@ export function ReservationManager({
               className="inline-flex overflow-x-auto rounded-xl border border-slate-200 bg-[#F8FAF9] p-1 shadow-inner shadow-slate-200/30"
               role="group"
             >
-              {(["all", "upcoming", "past", "cancelled"] as const).map((item) => (
+              {(["all", "upcoming", "ongoing", "past", "cancelled"] as const).map((item) => (
                 <button
                   className={cn(
                     "h-9 whitespace-nowrap rounded-lg px-3 text-sm font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#087F73]",

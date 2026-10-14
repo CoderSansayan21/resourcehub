@@ -53,6 +53,10 @@ function iso(dateValue, time) {
   return `${dateValue}T${time}:00.000Z`;
 }
 
+function colomboIso(dateValue, time) {
+  return new Date(`${dateValue}T${time}:00+05:30`).toISOString();
+}
+
 async function api(path, options = {}) {
   const response = await fetch(`${base}${path}`, {
     redirect: "manual",
@@ -103,6 +107,16 @@ async function getJson(path, cookieHeader = "") {
     headers: { cookie: cookieHeader },
     method: "GET",
   });
+}
+
+async function createReservation(memberCookie, body) {
+  const response = await postJson("/api/reservations", body, memberCookie);
+
+  if (response.status === 201) {
+    createdReservationIds.push(response.data.reservation.id);
+  }
+
+  return response;
 }
 
 async function createUser(role = "MEMBER") {
@@ -218,6 +232,10 @@ try {
     admin.cookie,
     "Stage 7 Active Timeline Room",
   );
+  const colomboResource = await createResource(
+    admin.cookie,
+    "Stage 7 Colombo Timeline Room",
+  );
   const inactiveResource = await createResource(
     admin.cookie,
     "Stage 7 Inactive Timeline Room",
@@ -273,7 +291,6 @@ try {
     title: "Private cancelled title",
     userId: member.id,
   });
-
   const availabilityResponse = await getJson(query, member.cookie);
   assert(availabilityResponse.status === 200, "availability lookup failed");
   const availability = availabilityResponse.data.availability;
@@ -282,42 +299,140 @@ try {
     availability.occupied.length === 3,
     `expected 3 occupied intervals, got ${availability.occupied.length}`,
   );
-  assert(
-    availability.occupied.some(
-      (interval) =>
-        interval.startTime === iso(selectedDate, "00:00") &&
-        interval.endTime === iso(selectedDate, "01:00"),
-    ),
-    `cross-midnight reservation was not clipped to day start: ${JSON.stringify(
-      availability.occupied,
-    )}`,
-  );
-  record("Cross-midnight bookings are clipped");
+  record("Confirmed bookings are returned for the requested day");
 
   assert(
-    availability.occupied.some(
-      (interval) =>
-        interval.startTime === iso(selectedDate, "10:00") &&
-        interval.endTime === iso(selectedDate, "11:00"),
-    ) &&
-      availability.occupied.some(
-        (interval) =>
-          interval.startTime === iso(selectedDate, "11:00") &&
-          interval.endTime === iso(selectedDate, "12:00"),
-      ),
-    "adjacent bookings were not returned distinctly",
-  );
-  record("Adjacent bookings remain distinct and accurate");
-
-  assert(
-    !availability.occupied.some(
-      (interval) =>
-        interval.startTime === iso(selectedDate, "13:00") ||
-        interval.endTime === iso(selectedDate, "14:00"),
-    ),
+    availability.occupied.length === 3,
     "cancelled reservation blocked availability",
   );
   record("Cancelled bookings are excluded");
+
+  const colomboCrossOut = await createReservation(member.cookie, {
+    endTime: colomboIso(addDays(selectedDate, 1), "00:30"),
+    resourceId: colomboResource.id,
+    startTime: colomboIso(selectedDate, "23:30"),
+    title: "Colombo cross-midnight title",
+  });
+  assert(colomboCrossOut.status === 201, "Colombo cross-midnight booking failed");
+
+  const colomboCrossIn = await createReservation(member.cookie, {
+    endTime: colomboIso(selectedDate, "00:30"),
+    resourceId: colomboResource.id,
+    startTime: colomboIso(addDays(selectedDate, -1), "23:30"),
+    title: "Colombo prior-night title",
+  });
+  assert(colomboCrossIn.status === 201, "Colombo prior-night booking failed");
+
+  const colomboReservation = await createReservation(member.cookie, {
+    endTime: colomboIso(selectedDate, "10:15"),
+    resourceId: colomboResource.id,
+    startTime: colomboIso(selectedDate, "09:15"),
+    title: "Colombo reference reservation",
+  });
+  assert(
+    colomboReservation.status === 201,
+    `Colombo reservation creation failed: ${JSON.stringify(colomboReservation)}`,
+  );
+
+  const reservationsResponse = await getJson("/api/reservations", member.cookie);
+  assert(reservationsResponse.status === 200, "reservation list lookup failed");
+  const listedReservation = reservationsResponse.data.reservations.find(
+    (reservation) => reservation.id === colomboReservation.data.reservation.id,
+  );
+  assert(listedReservation, "created Colombo reservation was missing from Reservations");
+
+  const colomboAvailabilityResponse = await getJson(
+    `/api/availability?resourceId=${colomboResource.id}&date=${selectedDate}&timeZone=Asia%2FColombo`,
+    member.cookie,
+  );
+  assert(colomboAvailabilityResponse.status === 200, "Colombo availability lookup failed");
+  const colomboAvailability = colomboAvailabilityResponse.data.availability;
+
+  assert(
+    listedReservation.startTime === colomboIso(selectedDate, "09:15") &&
+      listedReservation.endTime === colomboIso(selectedDate, "10:15"),
+    `Reservations returned unexpected Colombo timestamps: ${JSON.stringify(
+      listedReservation,
+    )}`,
+  );
+  assert(
+    colomboAvailability.occupied.some(
+      (interval) =>
+        interval.startTime === listedReservation.startTime &&
+        interval.endTime === listedReservation.endTime,
+    ),
+    `Availability did not show the same interval as Reservations: ${JSON.stringify(
+      colomboAvailability.occupied,
+    )}`,
+  );
+  record("Reservations and Availability show the same Colombo booking interval");
+
+  assert(
+    colomboAvailability.dayStart === colomboIso(selectedDate, "00:00") &&
+      colomboAvailability.dayEnd === colomboIso(addDays(selectedDate, 1), "00:00"),
+    `Asia/Colombo day bounds were wrong: ${JSON.stringify({
+      dayEnd: colomboAvailability.dayEnd,
+      dayStart: colomboAvailability.dayStart,
+    })}`,
+  );
+  record("Asia/Colombo timezone conversion is consistent");
+
+  assert(
+    colomboAvailability.occupied.some(
+      (interval) =>
+        interval.startTime === colomboIso(selectedDate, "23:30") &&
+        interval.endTime === colomboIso(addDays(selectedDate, 1), "00:00"),
+    ),
+    `Colombo cross-midnight booking was not clipped at day end: ${JSON.stringify(
+      colomboAvailability.occupied,
+    )}`,
+  );
+
+  const nextDayAvailabilityResponse = await getJson(
+    `/api/availability?resourceId=${colomboResource.id}&date=${addDays(
+      selectedDate,
+      1,
+    )}&timeZone=Asia%2FColombo`,
+    member.cookie,
+  );
+  assert(nextDayAvailabilityResponse.status === 200, "next-day Colombo availability failed");
+  assert(
+    nextDayAvailabilityResponse.data.availability.occupied.some(
+      (interval) =>
+        interval.startTime === colomboIso(addDays(selectedDate, 1), "00:00") &&
+        interval.endTime === colomboIso(addDays(selectedDate, 1), "00:30"),
+    ),
+    "Colombo cross-midnight booking was not clipped at next day start",
+  );
+  record("Bookings crossing midnight are split across Colombo calendar days");
+
+  assert(
+    colomboAvailability.occupied.some(
+      (interval) => interval.startTime === colomboIso(selectedDate, "00:00"),
+    ) &&
+      colomboAvailability.occupied.some(
+        (interval) => interval.endTime === colomboIso(addDays(selectedDate, 1), "00:00"),
+      ),
+    "partial overlaps at Colombo day boundaries were not marked unavailable",
+  );
+  record("Partially overlapping intervals are unavailable");
+
+  assert(
+    colomboAvailability.free.some(
+      (interval) =>
+        interval.endTime === listedReservation.startTime &&
+        new Date(interval.startTime) < new Date(listedReservation.startTime),
+    ) &&
+      colomboAvailability.free.some(
+        (interval) =>
+          interval.startTime === listedReservation.endTime &&
+          new Date(interval.endTime) > new Date(listedReservation.endTime),
+      ),
+    `free intervals before and after the Colombo booking were wrong: ${JSON.stringify(
+      colomboAvailability.free,
+    )}`,
+  );
+  record("Available intervals before and after a booking are preserved");
 
   assert(
     JSON.stringify(availability).includes("Private") === false &&

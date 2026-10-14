@@ -259,6 +259,53 @@ try {
   assert(adminInspect.status === 200, "admin could not inspect reservation");
   record("Admin can list and inspect all reservations");
 
+  const adminCancelTarget = await createReservation(memberA.cookie, {
+    endTime: futureIso(9, 11),
+    resourceId: activeResource.id,
+    startTime: futureIso(9, 10),
+    title: "Admin cancellation target",
+  });
+  assert(adminCancelTarget.status === 201, "admin cancellation target was not created");
+  const adminCancelTargetId = adminCancelTarget.data.reservation.id;
+
+  const memberBCancelOther = await patchEmpty(
+    `/api/reservations/${adminCancelTargetId}/cancel`,
+    memberB.cookie,
+  );
+  assert(
+    memberBCancelOther.status === 403,
+    "member cancelled another member's reservation",
+  );
+
+  const adminCancel = await patchEmpty(
+    `/api/reservations/${adminCancelTargetId}/cancel`,
+    admin.cookie,
+  );
+  assert(
+    adminCancel.status === 200 &&
+      adminCancel.data.reservation.status === "CANCELLED" &&
+      adminCancel.data.reservation.user.email === memberA.email,
+    "admin could not cancel a member reservation",
+  );
+
+  const repeatedAdminCancel = await patchEmpty(
+    `/api/reservations/${adminCancelTargetId}/cancel`,
+    admin.cookie,
+  );
+  assert(repeatedAdminCancel.status === 409, "repeated cancellation was accepted");
+
+  const adminCancelledReplacement = await createReservation(memberB.cookie, {
+    endTime: futureIso(9, 10, 45),
+    resourceId: activeResource.id,
+    startTime: futureIso(9, 10, 15),
+    title: "Replacement after admin cancellation",
+  });
+  assert(
+    adminCancelledReplacement.status === 201,
+    "admin-cancelled booking still blocked the time slot",
+  );
+  record("Admin can cancel eligible member reservations safely");
+
   const overlap = await createReservation(memberB.cookie, {
     endTime: futureIso(7, 10, 45),
     resourceId: activeResource.id,

@@ -55,13 +55,35 @@ type AvailabilityResponse = {
   error?: { message?: string };
 };
 
-function getTodayDate() {
-  const date = new Date();
-  const pad = (value: number) => String(value).padStart(2, "0");
+const RESOURCEHUB_TIME_ZONE = "Asia/Colombo";
 
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate(),
-  )}`;
+function getDatePartsInTimeZone(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone,
+    year: "numeric",
+  }).formatToParts(date);
+  const lookup = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  return {
+    day: lookup.day,
+    month: lookup.month,
+    year: lookup.year,
+  };
+}
+
+function getTodayDate() {
+  const { day, month, year } = getDatePartsInTimeZone(
+    new Date(),
+    RESOURCEHUB_TIME_ZONE,
+  );
+
+  return `${year}-${month}-${day}`;
 }
 
 function addDays(dateValue: string, amount: number) {
@@ -72,10 +94,6 @@ function addDays(dateValue: string, amount: number) {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(
     date.getUTCDate(),
   )}`;
-}
-
-function getBrowserTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
 function getTimeZoneLabel(timeZone: string) {
@@ -170,7 +188,7 @@ export function AvailabilityTimeline({
       : resources[0]?.id ?? "",
   );
   const [date, setDate] = useState(initialDate ?? getTodayDate);
-  const [timeZone] = useState(getBrowserTimeZone);
+  const [timeZone] = useState(RESOURCEHUB_TIME_ZONE);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const router = useRouter();
   const pathname = usePathname();

@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ResourceHub
 
-## Getting Started
+ResourceHub is a Next.js App Router internship assessment project for browsing,
+administering, and booking shared workplace resources.
 
-First, run the development server:
+## Local Setup
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a local PostgreSQL database. One common `psql` flow is:
+
+```bash
+createdb resourcehub
+```
+
+If your local PostgreSQL installation requires an explicit user, create the
+database with the user your connection string will use:
+
+```bash
+createdb -U postgres resourcehub
+```
+
+Copy the environment template and fill in local values:
+
+```bash
+cp .env.example .env
+```
+
+Set `DATABASE_URL` to your local database. Do not commit real secrets.
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/resourcehub?schema=public"
+BETTER_AUTH_SECRET="replace-with-a-random-32-byte-secret"
+BETTER_AUTH_URL="http://localhost:3000"
+```
+
+Run Prisma migrations:
+
+```bash
+npx prisma migrate dev
+```
+
+Seed assessment sample resources:
+
+```bash
+npm run db:seed
+```
+
+Start the application:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Seed Data
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The seed script is intended for local development and assessment demonstration
+only. It refuses to run when production environment flags are present, requires a
+valid `DATABASE_URL`, and does not log credentials.
 
-## Learn More
+The seed creates these active resources when they do not already exist:
 
-To learn more about Next.js, take a look at the following resources:
+| Category | Resource | Capacity |
+| --- | --- | --- |
+| Meeting Rooms | Conference Room A | 12 |
+| Meeting Rooms | Boardroom B | 20 |
+| Equipment | Projector 01 | 1 |
+| Equipment | Video Conference Kit | 1 |
+| Workspaces | Focus Desk 01 | 1 |
+| Workspaces | Collaboration Area | 8 |
+| Computer Labs | Training Lab A | 24 |
+| Others | Photography Studio | 6 |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The existing `Resource` model has no dedicated seed identifier or uniqueness
+constraint for sample data. To stay safe, the seed uses a normalized resource
+name duplicate check and only creates missing samples. Existing resources with
+matching names are skipped and never overwritten, so ADMIN edits are preserved.
+The seed does not delete resources, modify users, reset passwords, create
+reservations, or change booking logic.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Reviewer Flow
 
-## Deploy on Vercel
+1. Run migrations and `npm run db:seed`.
+2. Start the app with `npm run dev`.
+3. Register or sign in.
+4. Browse the seeded active resources from the member resource catalog.
+5. Open a resource detail page, choose an available time, and book it.
+6. Use an ADMIN account to manage resource visibility and inspect reservations.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Useful Commands
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx prisma validate
+npm run lint
+npm run build
+npm run db:seed
+```

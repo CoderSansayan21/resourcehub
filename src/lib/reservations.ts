@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Reservation, Resource } from "@/generated/prisma/client";
+import type { Reservation, Resource, User } from "@/generated/prisma/client";
 import { ReservationStatus } from "@/generated/prisma/enums";
 import type { CurrentUser } from "@/lib/authorization";
 import { getCurrentUser } from "@/lib/authorization";
@@ -37,6 +37,7 @@ const MAX_RESERVATION_DURATION_MS = 8 * 60 * 60 * 1000;
 
 type ReservationWithResource = Reservation & {
   resource: Pick<Resource, "id" | "name" | "type" | "location" | "capacity" | "isActive">;
+  user: Pick<User, "email" | "id" | "name">;
 };
 
 type ReservationWriteData = {
@@ -65,6 +66,11 @@ export type ReservationDto = {
   status: ReservationStatus;
   title: string;
   updatedAt: string;
+  user: {
+    email: string;
+    id: string;
+    name: string;
+  };
   userId: string;
 };
 
@@ -147,6 +153,11 @@ function toReservationDto(reservation: ReservationWithResource): ReservationDto 
     status: reservation.status,
     title: reservation.title,
     updatedAt: reservation.updatedAt.toISOString(),
+    user: {
+      email: reservation.user.email,
+      id: reservation.user.id,
+      name: reservation.user.name,
+    },
     userId: reservation.userId,
   };
 }
@@ -440,6 +451,13 @@ async function findVisibleReservation(id: string, user: CurrentUser) {
           type: true,
         },
       },
+      user: {
+        select: {
+          email: true,
+          id: true,
+          name: true,
+        },
+      },
     },
     where: user.role === "ADMIN" ? { id } : { id, userId: user.id },
   });
@@ -464,6 +482,13 @@ async function findOwnedReservation(id: string, user: CurrentUser) {
           location: true,
           name: true,
           type: true,
+        },
+      },
+      user: {
+        select: {
+          email: true,
+          id: true,
+          name: true,
         },
       },
     },
@@ -498,6 +523,13 @@ export async function listReservationsForCurrentUser() {
           location: true,
           name: true,
           type: true,
+        },
+      },
+      user: {
+        select: {
+          email: true,
+          id: true,
+          name: true,
         },
       },
     },
@@ -546,6 +578,13 @@ export async function createReservation(input: unknown) {
             location: true,
             name: true,
             type: true,
+          },
+        },
+        user: {
+          select: {
+            email: true,
+            id: true,
+            name: true,
           },
         },
       },
@@ -603,6 +642,13 @@ export async function updateReservation(id: string, input: unknown) {
             type: true,
           },
         },
+        user: {
+          select: {
+            email: true,
+            id: true,
+            name: true,
+          },
+        },
       },
       where: { id },
     });
@@ -615,14 +661,42 @@ export async function updateReservation(id: string, input: unknown) {
 
 export async function cancelReservation(id: string) {
   const user = await requireReservationUser();
-  const existing = await findOwnedReservation(id, user);
+  const existing = await (user.role === "ADMIN"
+    ? findVisibleReservation(id, user)
+    : findOwnedReservation(id, user));
 
-  if (existing.status === ReservationStatus.CANCELLED) {
-    return toReservationDto(existing);
+  if (existing.status !== ReservationStatus.CONFIRMED) {
+    throw new ReservationOperationError(
+      409,
+      "Only confirmed reservations can be cancelled.",
+    );
   }
 
-  const reservation = await prisma.reservation.update({
+  if (existing.startTime <= new Date()) {
+    throw new ReservationOperationError(
+      409,
+      "Only future reservations can be cancelled.",
+    );
+  }
+
+  const update = await prisma.reservation.updateMany({
     data: { status: ReservationStatus.CANCELLED },
+    where: {
+      id,
+      startTime: { gt: new Date() },
+      status: ReservationStatus.CONFIRMED,
+      ...(user.role === "ADMIN" ? {} : { userId: user.id }),
+    },
+  });
+
+  if (update.count !== 1) {
+    throw new ReservationOperationError(
+      409,
+      "Reservation is no longer eligible for cancellation.",
+    );
+  }
+
+  const reservation = await prisma.reservation.findUnique({
     include: {
       resource: {
         select: {
@@ -634,9 +708,20 @@ export async function cancelReservation(id: string) {
           type: true,
         },
       },
+      user: {
+        select: {
+          email: true,
+          id: true,
+          name: true,
+        },
+      },
     },
     where: { id },
   });
+
+  if (!reservation) {
+    throw new ReservationOperationError(404, "Reservation was not found.");
+  }
 
   return toReservationDto(reservation);
 }
