@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "prisma generate",
     "admin:promote": "jiti scripts/promote-admin.mts",
     "db:seed": "jiti scripts/seed.mts",
     "start": "next start",

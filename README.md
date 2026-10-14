@@ -219,7 +219,15 @@ BETTER_AUTH_URL="http://localhost:3000"
 
 Use a real local PostgreSQL username/password and a strong local `BETTER_AUTH_SECRET`. Do not commit `.env` or real secrets.
 
-### 5. Apply Prisma Migrations
+### 5. Generate Prisma Client
+
+```bash
+npx prisma generate
+```
+
+This creates the ignored local client under `src/generated/prisma`, which is required by the application and seed scripts.
+
+### 6. Apply Prisma Migrations
 
 ```bash
 npx prisma migrate deploy
@@ -227,13 +235,13 @@ npx prisma migrate deploy
 
 For local development where you are intentionally creating or changing migrations, use Prisma's development workflow separately. Reviewers should be able to apply the existing migrations with the command above.
 
-### 6. Seed Sample Resources
+### 7. Seed Sample Resources
 
 ```bash
 npm run db:seed
 ```
 
-### 7. Start the Development Server
+### 8. Start the Development Server
 
 ```bash
 npm run dev
@@ -245,7 +253,7 @@ Open:
 http://localhost:3000
 ```
 
-### 8. Create a Local ADMIN Account for Review
+### 9. Create a Local ADMIN Account for Review
 
 Public registration always creates a MEMBER account. To review ADMIN features locally:
 
@@ -283,11 +291,7 @@ ResourceHub uses Better Auth email/password authentication.
 
 Public registration creates MEMBER accounts only. The code intentionally sets new users to `MEMBER` and does not expose public ADMIN registration.
 
-For local assessment review, a trusted developer can promote an existing registered MEMBER account with:
-
-```bash
-npm run admin:promote -- reviewer@example.com
-```
+For local ADMIN account setup, see [Step 9: Create a Local ADMIN Account for Review](#9-create-a-local-admin-account-for-review).
 
 The promotion command uses the existing Prisma/PostgreSQL setup, requires `DATABASE_URL`, refuses production environment flags, updates only the matching user's role, and leaves bookings unchanged.
 
@@ -377,16 +381,6 @@ Manual reviewer checklist:
 
 **Demo Video (3-5 minutes):** [Watch demo video](https://drive.google.com/file/d/1NAMySMuUgfRetdrQ3tTZsq3g0NLo2E-O/view?usp=sharing)
 
-Suggested demo flow:
-
-1. Explain the workplace resource reservation problem.
-2. Register/sign in as a member and browse seeded resources.
-3. Check availability and create a reservation.
-4. Demonstrate overlap rejection.
-5. Show member reservation history and cancellation.
-6. Switch to an admin account, manage resources, view member reservations, and cancel an eligible booking.
-7. Briefly explain PostgreSQL overlap protection, role-based authorization, and safe seed data.
-
 ## Submission
 
 Final assessment submission should include:
@@ -395,11 +389,3 @@ Final assessment submission should include:
 - Setup README: this file.
 - Shareable ER diagram URL: `https://drive.google.com/file/d/1xWF8MfT8sVZH_sXHjydeC-eyrIb1932t/view?usp=sharing`
 - 3-5 minute demo video URL: `https://drive.google.com/file/d/1NAMySMuUgfRetdrQ3tTZsq3g0NLo2E-O/view?usp=sharing`
-
-Assessment submission form:
-
-```text
-https://forms.gle/HzQH6tB5c4edPjnn8
-```
-
-Deadline: **October 15, 2026, 11:59 PM Sri Lanka time**.
